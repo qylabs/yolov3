@@ -53,7 +53,8 @@ if __name__ == '__main__':
     assert not (opt.device.lower() == 'cpu' and opt.half), '--half only compatible with GPU export, i.e. use --device 0'
 
     # Input
-    img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
+    # img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
+    img = torch.randn(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
 
     # Update model
     if opt.half:
@@ -67,6 +68,9 @@ if __name__ == '__main__':
                 m.act = Hardswish()
             elif isinstance(m.act, nn.SiLU):
                 m.act = SiLU()
+            elif isinstance(m.act,nn.LeakyReLU):
+                print('replace LeakyReLU as ReLU')
+                m.act=nn.ReLU()
         elif isinstance(m, models.yolo.Detect):
             m.inplace = opt.inplace
             m.onnx_dynamic = opt.dynamic
@@ -99,8 +103,9 @@ if __name__ == '__main__':
             torch.onnx.export(model, img, f, verbose=False, opset_version=opt.opset_version, input_names=['images'],
                               training=torch.onnx.TrainingMode.TRAINING if opt.train else torch.onnx.TrainingMode.EVAL,
                               do_constant_folding=not opt.train,
-                              dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # size(1,3,640,640)
-                                            'output': {0: 'batch', 2: 'y', 3: 'x'}} if opt.dynamic else None)
+                            #   dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # size(1,3,640,640)
+                            #                 'output': {0: 'batch', 2: 'y', 3: 'x'}} if opt.dynamic else None
+                              dynamic_axes={'images': {0: 'batch'}} if opt.dynamic else None)
 
             # Checks
             model_onnx = onnx.load(f)  # load onnx model
