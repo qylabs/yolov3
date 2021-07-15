@@ -10,6 +10,8 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
+from numpy.core.fromnumeric import shape
+
 sys.path.append(Path(__file__).parent.parent.absolute().__str__())  # to run '$ python *.py' files in subdirectories
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ class Detect(nn.Module):
     def __init__(self, nc=80, anchors=(), ch=(), inplace=True):  # detection layer
         super(Detect, self).__init__()
         self.nc = nc  # number of classes
-        self.no = nc + 5  # number of outputs per anchor
+        self.no = nc + 5  # number of outputs per anchor, class+confidence+bbx
         self.nl = len(anchors)  # number of detection layers
         self.na = len(anchors[0]) // 2  # number of anchors
         self.grid = [torch.zeros(1)] * self.nl  # init grid
@@ -296,17 +298,26 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
     return nn.Sequential(*layers), sorted(save) #save is [layer_idx 1,2,3...]
 
 
+def model_save(model_path):
+    ckpt = {'model': deepcopy(model).half(),
+            }
+
+    # Save model_path
+    torch.save(ckpt, model_path)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', type=str, default='yolov3-tiny.yaml', help='model.yaml')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--save_path', default='', help='save model path')
     opt = parser.parse_args()
     opt.cfg = check_file(opt.cfg)  # check file
     set_logging()
     device = select_device(opt.device)
 
     # Create model
-    model = Model(opt.cfg).to(device)
+    model = Model(opt.cfg,nc=1).to(device)
     print(model)
     # model.train()
 
@@ -317,6 +328,10 @@ if __name__ == '__main__':
     # y = model(img, profile=True)
     y=model(img)
     print('model out ',len(y))
+    
+    if opt.save_path:
+        print('save model to ',opt.save_path)
+        model_save(opt.save_path)
 
     # Tensorboard (not working https://github.com/ultralytics/yolov5/issues/2898)
     # from torch.utils.tensorboard import SummaryWriter

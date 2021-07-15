@@ -5,6 +5,7 @@ Usage:
 """
 
 import argparse
+from operator import mod
 import sys
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ from models.experimental import attempt_load
 from utils.activations import Hardswish, SiLU
 from utils.general import colorstr, check_img_size, check_requirements, file_size, set_logging
 from utils.torch_utils import select_device
+from models.yolo import Detect, Model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -45,10 +47,12 @@ if __name__ == '__main__':
     # Load PyTorch model
     device = select_device(opt.device)
     model = attempt_load(opt.weights, map_location=device)  # load FP32 model
+    # model=torch.load(opt.weights, map_location=device)
     labels = model.names
 
     # Checks
     gs = int(max(model.stride))  # grid size (max stride)
+    print('gs ',gs)
     opt.img_size = [check_img_size(x, gs) for x in opt.img_size]  # verify img_size are gs-multiples
     assert not (opt.device.lower() == 'cpu' and opt.half), '--half only compatible with GPU export, i.e. use --device 0'
 
