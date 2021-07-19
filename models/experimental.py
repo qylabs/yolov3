@@ -119,7 +119,7 @@ def attempt_load(weights, map_location=None, inplace=True,download=False):
         if download:
             ckpt = torch.load(attempt_download(w), map_location=map_location)  # load
         else:#for customal yaml
-            ckpt = torch.load(weights, map_location=map_location)
+            ckpt = torch.load(w, map_location=map_location)
         model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
 
     # Compatibility updates

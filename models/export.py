@@ -52,7 +52,6 @@ if __name__ == '__main__':
 
     # Checks
     gs = int(max(model.stride))  # grid size (max stride)
-    print('gs ',gs)
     opt.img_size = [check_img_size(x, gs) for x in opt.img_size]  # verify img_size are gs-multiples
     assert not (opt.device.lower() == 'cpu' and opt.half), '--half only compatible with GPU export, i.e. use --device 0'
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 WEIGHTS='weights/yolov3-tiny.pt'
+# WEIGHTS='weights/yolov3-tiny2.pt'
 IMG_SIZE=320
 
 
