@@ -33,3 +33,7 @@ thop  # FLOPS computation
 onnx
 onnxruntime
 tensorflow
+onnx-simplifier
+onnx-tf
+
+wandb
