@@ -1,12 +1,14 @@
 #!/bin/bash
 
-DATA=coco128.yaml
+DATA=data/coco128.yaml
 MODEL_CFG=models/yolov3-tiny2.yaml
 WEIGHTS=' '
+EPOCHS=300
 
 python train.py --cfg ${MODEL_CFG} \
-                --weights ${WEIGHTS} \
+                --weights '' \
                 --data ${DATA} \
-                --epochs 5 \
-                --batch-size 4
+                --epochs ${EPOCHS} \
+                --batch-size 16 \
+                > log.file 2>&1 &
                 

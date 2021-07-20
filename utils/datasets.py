@@ -389,7 +389,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             cache, exists = torch.load(cache_path), True  # load
             if cache['hash'] != get_hash(self.label_files + self.img_files):  # changed
                 cache, exists = self.cache_labels(cache_path, prefix), False  # re-cache
-        else:
+        else:#the cache_label read labels, verify the label format(0-1),save img shape and save all label infos as dict by torch.save
             cache, exists = self.cache_labels(cache_path, prefix), False  # cache
 
         # Display cache
