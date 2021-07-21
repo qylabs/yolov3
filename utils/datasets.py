@@ -548,7 +548,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
-            labels = self.labels[index].copy()
+            labels = self.labels[index].copy() #here,labels is np.array. the following xywhn2xyxz() require label coordinates [0,1],then translate back to pixels
             if labels.size:  # normalized xywh to pixel xyxy format
                 labels[:, 1:] = xywhn2xyxy(labels[:, 1:], ratio[0] * w, ratio[1] * h, padw=pad[0], padh=pad[1])
 
@@ -570,7 +570,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             #     labels = cutout(img, labels)
 
         nL = len(labels)  # number of labels
-        if nL:
+        if nL:#here change labels from xyxy to xywhn again
             labels[:, 1:5] = xyxy2xywh(labels[:, 1:5])  # convert xyxy to xywh
             labels[:, [2, 4]] /= img.shape[0]  # normalized height 0-1
             labels[:, [1, 3]] /= img.shape[1]  # normalized width 0-1

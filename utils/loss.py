@@ -126,7 +126,7 @@ class ComputeLoss:
                 ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
 
                 # Regression
-                pxy = ps[:, :2].sigmoid() * 2. - 0.5
+                pxy = ps[:, :2].sigmoid() * 2. - 0.5 #this should be align with yolo detect
                 pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
                 iou = bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
@@ -137,7 +137,7 @@ class ComputeLoss:
 
                 # Classification
                 if self.nc > 1:  # cls loss (only if multiple classes)
-                    t = torch.full_like(ps[:, 5:], self.cn, device=device)  # targets
+                    t = torch.full_like(ps[:, 5:], self.cn, device=device)  # targets, ps [0:4]bbox [5:]cls
                     t[range(n), tcls[i]] = self.cp
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
 
@@ -157,7 +157,7 @@ class ComputeLoss:
         lcls *= self.hyp['cls']
         bs = tobj.shape[0]  # batch size
 
-        loss = lbox + lobj + lcls
+        loss = lbox + lobj + lcls #iou_bbox_loss, obj_confidence_loss, cls_loss
         return loss * bs, torch.cat((lbox, lobj, lcls, loss)).detach()
 
     def build_targets(self, p, targets):
@@ -176,14 +176,14 @@ class ComputeLoss:
 
         for i in range(self.nl):
             anchors = self.anchors[i]
-            gain[2:6] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy gain
+            gain[2:6] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy gain. obatain the feature size
 
             # Match targets to anchors
-            t = targets * gain
+            t = targets * gain #scale targets[0,1] to this feature size and filter with anchor
             if nt:
                 # Matches
                 r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
-                j = torch.max(r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # compare
+                j = torch.max(r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # compare #assume all bbox in same centor, then compare wh ratio with anchor_thred. then filter out non matched bbox target
                 # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
                 t = t[j]  # filter
 
