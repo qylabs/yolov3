@@ -50,7 +50,7 @@ def LabelFolder(img_txt,label_path,target_path):
 
 
 
-def formatLabels(label_path):
+def formatLabels(label_path,rm_label=False):
     labels=glob(label_path+'/*.txt')
     print('len(labels) ',len(labels))
     for label_path in labels:
@@ -72,7 +72,18 @@ def formatLabels(label_path):
         fbbox[:,1:]=xywhn
         fbbox[:,0]=fbbox[:,0]-1 #widerperson use label 1-5
         # print('fbbox new ',fbbox)
-        np.savetxt(label_path,fbbox,fmt=['%d', '%10.5f', '%10.5f', '%10.5f', '%10.5f'])
+        if rm_label:
+            mask=fbbox[:,0]>0 #remove all label_idx >0 non_person
+            fbbox=fbbox[mask]
+        
+        if len(fbbox):
+            #not empty
+            np.savetxt(label_path,fbbox,fmt=['%d', '%10.5f', '%10.5f', '%10.5f', '%10.5f'])
+        else:
+            #fbbox is not empty,remove img and label
+            os.remove(img_path)
+            os.remove(label_path)
+
 
 
 
