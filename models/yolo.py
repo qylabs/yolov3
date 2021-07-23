@@ -311,6 +311,7 @@ if __name__ == '__main__':
     parser.add_argument('--cfg', type=str, default='yolov3-tiny.yaml', help='model.yaml')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--save_path', default='', help='save model path')
+    parser.add_argument('--gray_input', action='store_true', help='save model path')
     opt = parser.parse_args()
     opt.cfg = check_file(opt.cfg)  # check file
     set_logging()
@@ -322,7 +323,10 @@ if __name__ == '__main__':
     # model.train()
 
     # Profile
-    img = torch.rand(8 if torch.cuda.is_available() else 1, 3, 320, 320).to(device)
+    c=3
+    if opt.gray_input:
+        c=1
+    img = torch.rand(8 if torch.cuda.is_available() else 1, c, 320, 320).to(device)
     
     model.eval()
     # y = model(img, profile=True)
