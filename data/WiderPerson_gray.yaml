@@ -1,0 +1,25 @@
+#WiderPerson: A Diverse Dataset for Dense Pedestrian Detection in the Wild
+
+# 13,382 images and label about 400K annotations with various kinds of occlusions
+# 8000/1000/4382 images as training, validation and testing subsets
+
+# definition is
+#   '''
+#   class_label =1: pedestrians
+#   class_label =2: riders
+#   class_label =3: partially-visible persons
+#   class_label =4: ignore regions
+#   class_label =5: crowd
+#   '''
+# should -1
+
+# train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
+train: data/WiderPerson_gray/images/train/  # 8000 images
+val: data/WiderPerson_gray/images/val/  # 1000 images 
+
+# number of classes
+nc: 5
+
+# class names
+names: ['person','riders','partially-visible persons','ignore regions','crowd']
+  

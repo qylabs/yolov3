@@ -16,7 +16,9 @@ def img2gray(img_folder):
 
 
 if __name__=="__main__":
-    data_root='/home/xinglong/project/data/WiderPerson2'
+    #remember to copy original Dataset. This code will modify dataset images directly
+    #cp -r WiderPerson WiderPerson_gray
+    data_root='/home/xinglong/project/data/WiderPerson_gray'
 
     img_folder=data_root+'/Images/*.jpg'
     img2gray(img_folder)

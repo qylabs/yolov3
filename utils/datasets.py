@@ -596,6 +596,11 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
 
+        if hyp.get('gray'):
+            #gray=0.2989*r+0.5870*g+0.1140*b
+            img2=0.2989*img[0,:,:]+0.5870*img[1,:,:]+0.1140*img[2,:,:]
+            img=img2[np.newaxis,:]
+
         return torch.from_numpy(img), labels_out, self.img_files[index], shapes
 
     @staticmethod
