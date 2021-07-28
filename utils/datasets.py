@@ -145,6 +145,7 @@ class LoadImages:  # for inference
         self.nf = ni + nv  # number of files
         self.video_flag = [False] * ni + [True] * nv
         self.mode = 'image'
+        self.gray_input=False #default not gray img input
         if any(videos):
             self.new_video(videos[0])  # new video
         else:
@@ -177,6 +178,7 @@ class LoadImages:  # for inference
 
             self.frame += 1
             print(f'video {self.count + 1}/{self.nf} ({self.frame}/{self.frames}) {path}: ', end='')
+            # self.gray_input=True
 
         else:
             # Read image
@@ -185,12 +187,22 @@ class LoadImages:  # for inference
             assert img0 is not None, 'Image Not Found ' + path
             print(f'image {self.count}/{self.nf} {path}: ', end='')
 
+            img_org=cv2.imread(path,-1)#read original img
+            if img_org.ndim != img0.ndim:
+                #gray_input
+                self.gray_input=True
+
         # Padded resize
         img = letterbox(img0, self.img_size, stride=self.stride)[0]
 
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
+
+        if self.gray_input:
+            #gray=0.2989*r+0.5870*g+0.1140*b
+            img2=0.2989*img[0,:,:]+0.5870*img[1,:,:]+0.1140*img[2,:,:]
+            img=img2[np.newaxis,:]
 
         return path, img, img0, self.cap
 

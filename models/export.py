@@ -37,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--dynamic', action='store_true', help='dynamic ONNX axes')  # ONNX-only
     parser.add_argument('--simplify', action='store_true', help='simplify ONNX model')  # ONNX-only
     parser.add_argument('--opset-version', type=int, default=12, help='ONNX opset version')  # ONNX-only
+    parser.add_argument('--img-channel', type=int, default=3, help='input img channel')  # support various img channel
     opt = parser.parse_args()
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
     opt.include = [x.lower() for x in opt.include]
@@ -56,8 +57,9 @@ if __name__ == '__main__':
     assert not (opt.device.lower() == 'cpu' and opt.half), '--half only compatible with GPU export, i.e. use --device 0'
 
     # Input
-    # img = torch.zeros(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
-    img = torch.randn(opt.batch_size, 3, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
+    # img = torch.zeros(opt.batch_size, opt.img_channel, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
+    img = torch.randn(opt.batch_size, opt.img_channel, *opt.img_size).to(device)  # image size(1,3,320,192) iDetection
+    print('input img shape ',img.shape)
 
     # Update model
     if opt.half:
