@@ -1,7 +1,5 @@
 import os
 from glob import glob
-from imgaug.augmenters.contrast import GammaContrast
-from matplotlib.pyplot import axis
 
 import numpy as np
 import cv2
@@ -26,7 +24,7 @@ sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
 def img_augment(img_path,draw_bbs=False):
     '''
-    img_path should be in yolo_format  [cls,xn,yn,wn,hn]
+    img_path labels should be in yolo_format  [cls,xn,yn,wn,hn]
     return:
         image_aug, is numpy array rgb mode, can be saved using cv2.imwrite(name,image_aug)
         bbs_aug, is BoundingBoxesOnImage
@@ -36,9 +34,11 @@ def img_augment(img_path,draw_bbs=False):
 
     bbs_path=img_path.replace('images','labels').replace('.jpg','.txt')
     img_shape=image.shape
-    labels=np.loadtxt(bbs_path)
     w,h=img_shape[1],img_shape[0]
-
+    labels=np.loadtxt(bbs_path)
+    if labels.ndim==1:#for some case, y.ndim=1
+            labels=labels[np.newaxis,:]
+    
     bbs_xyxy=xywhn2xyxy(labels[:,1:],w,h)
     bbs_list=[BoundingBox(*bbs_xyxy[i]) for i in range(len(bbs_xyxy))]
     bbs = BoundingBoxesOnImage(bbs_list, shape=img_shape)
@@ -53,7 +53,7 @@ def img_augment(img_path,draw_bbs=False):
             sometimes(iaa.CropAndPad(
                 percent=(-0.05, 0.1),
                 pad_mode=ia.ALL,
-                pad_cval=(0, 255)
+                pad_cval=(0,255)
             )),
             sometimes(iaa.Affine(
                 scale={"x": (0.8, 1.2), "y": (0.8, 1.2)}, # scale images to 80-120% of their size, individually per axis
@@ -62,20 +62,20 @@ def img_augment(img_path,draw_bbs=False):
                 shear=(-16, 16), # shear by -16 to +16 degrees
                 order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
                 cval=(0, 255), # if mode is constant, use a cval between 0 and 255
-                mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
+                mode='constant' # use any of scikit-image's warping modes (see 2nd image from the top for examples)
             )),
             # execute 0 to 5 of the following (less important) augmenters per image
             # don't execute all of them, as that would often be way too strong
             iaa.SomeOf((0, 3),
                 [
-                    sometimes(iaa.Superpixels(p_replace=(0, 1.0), n_segments=(20, 200))), # convert images into their superpixel representation
+                    # sometimes(iaa.Superpixels(p_replace=(0, 1.0), n_segments=(20, 200))), # convert images into their superpixel representation
                     iaa.OneOf([
                         iaa.GaussianBlur((0, 3.0)), # blur images with a sigma between 0 and 3.0
                         iaa.AverageBlur(k=(2, 7)), # blur image using local means with kernel sizes between 2 and 7
                         iaa.MedianBlur(k=(3, 11)), # blur image using local medians with kernel sizes between 2 and 7
                     ]),
-                    iaa.Sharpen(alpha=(0, 1.0), lightness=(0.5, 1.5)), # sharpen images
-                    iaa.Emboss(alpha=(0, 1.0), strength=(0, 2.0)), # emboss images
+                    iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.25)), # sharpen images
+                    iaa.Emboss(alpha=(0, 1.0), strength=(0, 0.2)), # emboss images
                     # search either for all edges or for directed edges,
                     # blend the result with the original image using a blobby mask
                     # iaa.BlendAlphaSimplexNoise(iaa.OneOf([
@@ -127,14 +127,61 @@ def img_augment(img_path,draw_bbs=False):
     return image_aug,bbs_aug
 
 
-def main(img_path,target_path,aug_scale=5):
+def main(imgs_path,target_path,aug_scale=5,gray=False):
+    '''
+    aug_scale: repeat imgs times
+    '''
+    target_label_path=target_path.replace('images','labels')
+    if os.path.exists(target_path):
+        os.rmdir(target_path)
+    os.makedirs(target_path)
+
+    if os.path.exists(target_label_path):
+        os.rmdir(target_label_path)
+    os.makedirs(target_label_path)
+
+
+    imgs_list=glob(imgs_path+'/*.jpg')
+    print('len(imgs_list)',len(imgs_list))
+    for i, img_path in enumerate(imgs_list):
+        print('===Process img No.{},img={}'.format(i,img_path))
+        img_base_name=os.path.basename(img_path)
+        bbs_org=img_path.replace('images','labels').replace('.jpg','.txt')
+        labels_org=np.loadtxt(bbs_org)
+        if labels_org.ndim==1:#for some case, y.ndim=1
+            labels_org=labels_org[np.newaxis,:]
+        
+        #repeat aug_scale times
+        for idx in range(aug_scale):
+            image_aug,bbs_aug=img_augment(img_path)
+            width,height=bbs_aug.width,bbs_aug.height
+            bbs_list=bbs_aug.items
+            xywhn=np.array([[bbs.center_x/width,bbs.center_y/height,bbs.width/width,bbs.height/height] for bbs in bbs_list])
+            fbbox=labels_org.copy()
+            assert fbbox[...,1:].shape==xywhn.shape,'fbbox[:,1:].shape!=xywhn.shape'
+            fbbox[...,1:]=xywhn
+
+            img_target_path=os.path.join(target_path,img_base_name.replace('.jpg','_'+str(idx)+'.jpg'))
+            if gray:
+                image_aug=cv2.cvtColor(image_aug,cv2.COLOR_RGB2GRAY)
+            cv2.imwrite(img_target_path,image_aug)
+            
+            label_target_path=img_target_path.replace('images','labels').replace('.jpg','.txt')
+            np.savetxt(label_target_path,fbbox,fmt=['%d', '%10.5f', '%10.5f', '%10.5f', '%10.5f'])
     
-    image_aug,bbs_aug=img_augment(img_path)
+    print('Success!')
+
+
 
 
 
 if __name__=="__main__":
-    root='/home/xinglong/project/yolov3/'
-    img_path=root+'data/WiderPerson_gray/images/train/'
-    target_path=root+'data/cust_aug/'
-    main(img_path,target_path)
+    root='/home/xinglong/project/yolov3'
+
+    # dataset_path=root+'data/WiderPerson_gray/images/train'
+    # target_path=root+'data/cust_aug/images/train'
+    # main(dataset_path,target_path)
+
+    imgs_path=root+'/data/WiderPerson_gray/images/val'
+    target_path=root+'/data/cust_aug/images/val'
+    main(imgs_path,target_path,gray=True)

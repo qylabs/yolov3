@@ -36,4 +36,5 @@ tensorflow
 onnx-simplifier
 onnx-tf
 
+imgaug
 wandb
