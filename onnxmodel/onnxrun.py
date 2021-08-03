@@ -2,6 +2,11 @@ import numpy as np
 import onnxruntime as ort
 import cv2
 
+strides=[16,32]
+
+anchors=[[10,14, 23,27, 37,58]  # P4/16
+        ,[81,82, 135,169, 344,319]]  # P5/32
+
 
 def NMS(dets,threshold):
     '''
@@ -192,6 +197,19 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
         # print('4 output.shape',output.shape)
 
     return output
+
+
+def make_grid(nx=20,ny=20):
+    '''
+    nx,ny=feature_shape
+    '''
+    yv, xv = np.meshgrid(np.arange(ny), np.arange(nx))
+    return np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32)
+
+def center2grid(y,strid,grid,anchor_grid):
+    y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * stride[i]  # xy
+    y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
+    return y
 
 
 def transfrom_img(img_path,gray_input=False):
