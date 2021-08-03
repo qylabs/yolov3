@@ -1,7 +1,6 @@
 import numpy as np
 import onnxruntime as ort
 import cv2
-import time
 
 
 def NMS(dets,threshold):
@@ -74,6 +73,24 @@ def xywh2xyxy(x):
     return y
 
 
+def plot_one_box(x, im, img_save_path,color=(128, 128, 128), label=None, line_thickness=1):
+    '''
+    x is xyxy
+    '''
+    # Plots one bounding box on image 'im' using OpenCV
+    tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
+    c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
+    cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    print('c1,c2',c1,c2)
+    if label:
+        tf = max(tl - 1, 1)  # font thickness
+        t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
+        c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+        cv2.rectangle(im, c1, c2, color, -1, cv2.LINE_AA)  # filled
+        cv2.putText(im, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
+
+    cv2.imwrite(img_save_path,im)
+
 def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None, agnostic=False, multi_label=False,
                         labels=(), max_det=300):
     """Runs Non-Maximum Suppression (NMS) on inference results
@@ -98,9 +115,8 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
     # multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
     # merge = False  # use merge-NMS
 
-    t = time.time()
-    # output = [torch.zeros((0, 6))] * prediction.shape[0]
-    output=[]
+    ##support batch-images
+    output=[[]]*prediction.shape[0]
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
@@ -172,7 +188,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
         keep_dets=NMS(x,iou_thres)
         # print('keep_dets',keep_dets)
 
-        output=x[keep_dets]
+        output[xi]=x[keep_dets]
         # print('4 output.shape',output.shape)
 
     return output
@@ -180,10 +196,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
 
 def transfrom_img(img_path,gray_input=False):
     img=cv2.imread(img_path)
-    # mean=np.mean(img,axis=(0,1))
-    # std=np.std(img,axis=(0,1))
-    # final=np.transpose((img-mean)/std,(2,0,1)).astype(np.float32)
-    final=np.transpose(img,(2,0,1)).astype(np.float32)
+    final=np.transpose(img,(2,0,1)).astype(np.float32) #BGR2RGB
     final = np.ascontiguousarray(final)
     
     if gray_input:
@@ -206,9 +219,34 @@ def onnxrun(onnx_path,input_array):
     return ort_outs
 
 
-def yolo_post_proc(pred,conf_thres=0.2,iou_thres=0.45):
-    pred = non_max_suppression(pred, conf_thres,iou_thres)
-    return pred
+def yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45):
+    '''
+    single one img
+    '''
+    img0=cv2.imread(img_path)
+    #preproc img
+    input_array=transfrom_img(img_path,gray_input=True)
+    print(input_array.shape)
+    out=onnxrun(onnx_path,input_array)[0] #onnx-graph has only 1 output
+
+    #postproc 
+    #nms out
+    pred = non_max_suppression(out, conf_thres,iou_thres)
+    print('pred_nms ',pred)
+
+    #plot
+    img_save_path=img_path+'.jpg'
+    print(img_save_path)
+    for i, det in enumerate(pred):  # detections per image
+        print(i,', det',det)
+        for *xyxy, conf, cls in det:
+            print('xyxy ',xyxy)
+            c = int(cls)  # integer class
+            label_mark=f'{c}-{conf:.2f}'
+            print('label_mark ',label_mark)
+            plot_one_box(xyxy, img0, img_save_path,color=(2, 8, 255),label=label_mark)
+    print('end')
+
 
 if __name__=="__main__":
     # onnx_path='./weights/yolov3-tiny_sim.onnx'
@@ -227,14 +265,14 @@ if __name__=="__main__":
     input_array=transfrom_img('./img_OUT_0_resize.ppm',gray_input=True)
     print(input_array.shape)
     
-
-
     out=onnxrun(onnx_path,input_array)[0] #onnx-graph has only 1 output
     print('out.shape ',out.shape)
     print("out ",out[0][:3])
 
-    out_nms=yolo_post_proc(out,0.2,0.45)
-    print('out_nms',out_nms)
+
+    img_path='./img_OUT_0_resize.ppm'
+    yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45)
+    
 
 
     
