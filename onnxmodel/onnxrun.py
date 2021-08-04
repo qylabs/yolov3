@@ -2,7 +2,7 @@ import numpy as np
 import onnxruntime as ort
 import cv2
 
-strides=[16,32]
+strides=[16,32] #
 
 anchors=[[10,14, 23,27, 37,58]  # P4/16
         ,[81,82, 135,169, 344,319]]  # P5/32
@@ -204,7 +204,31 @@ def make_grid(nx=20,ny=20):
     nx,ny=feature_shape
     '''
     yv, xv = np.meshgrid(np.arange(ny), np.arange(nx))
-    return np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32)
+    grid=np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32) #center point grid
+    return grid
+
+
+def make_anchor_grid(anchor):
+    '''
+    anchor is list,len(anchor)=head_num
+
+    yolov3-tiny anchors:
+        anchors=[[10,14, 23,27, 37,58]  # P4/16
+                ,[81,82, 135,169, 344,319]]  # P5/32
+    
+    feature shape=(bs,na,nx,ny,no)
+        no: number of outputs per anchor, class+confidence+bbx
+        na: number of anchors
+        (nx,ny): feature size
+        bs: batch_size
+
+    '''
+    nl = len(anchors)  # number of detection layers
+    na = len(anchors[0]) // 2  # number of anchors
+    a = np.array(anchors).reshape(nl, -1, 2).astype(np.float32) #anchor reshaped as (nl=2,na=3,2), 2 head,3anchors,2 width/height of anchors
+    anchor_grid=a.reshape(nl, 1, -1, 1, 1, 2) # shape(nl,1,na,1,1,2), align with nl, then 1(for pred_wh broadcast), then na, then (1,1) then 2(width,height)
+    return anchor_grid
+
 
 def center2grid(y,strid,grid,anchor_grid):
     y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * stride[i]  # xy
