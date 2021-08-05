@@ -199,43 +199,6 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
     return output
 
 
-def make_grid(nx=20,ny=20):
-    '''
-    nx,ny=feature_shape
-    '''
-    yv, xv = np.meshgrid(np.arange(ny), np.arange(nx))
-    grid=np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32) #center point grid
-    return grid
-
-
-def make_anchor_grid(anchor):
-    '''
-    anchor is list,len(anchor)=head_num
-
-    yolov3-tiny anchors:
-        anchors=[[10,14, 23,27, 37,58]  # P4/16
-                ,[81,82, 135,169, 344,319]]  # P5/32
-    
-    feature shape=(bs,na,nx,ny,no)
-        no: number of outputs per anchor, class+confidence+bbx
-        na: number of anchors
-        (nx,ny): feature size
-        bs: batch_size
-
-    '''
-    nl = len(anchors)  # number of detection layers
-    na = len(anchors[0]) // 2  # number of anchors
-    a = np.array(anchors).reshape(nl, -1, 2).astype(np.float32) #anchor reshaped as (nl=2,na=3,2), 2 head,3anchors,2 width/height of anchors
-    anchor_grid=a.reshape(nl, 1, -1, 1, 1, 2) # shape(nl,1,na,1,1,2), align with nl, then 1(for pred_wh broadcast), then na, then (1,1) then 2(width,height)
-    return anchor_grid
-
-
-def center2grid(y,strid,grid,anchor_grid):
-    y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * stride[i]  # xy
-    y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
-    return y
-
-
 def transfrom_img(img_path,gray_input=False):
     img=cv2.imread(img_path)
     final=np.transpose(img,(2,0,1)).astype(np.float32) #BGR2RGB
@@ -270,7 +233,7 @@ def yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45):
     input_array=transfrom_img(img_path,gray_input=True)
     print(input_array.shape)
     out=onnxrun(onnx_path,input_array)[0] #onnx-graph has only 1 output
-
+    print('out.shape ',out.shape)
     #postproc 
     #nms out
     pred = non_max_suppression(out, conf_thres,iou_thres)
@@ -288,6 +251,63 @@ def yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45):
             print('label_mark ',label_mark)
             plot_one_box(xyxy, img0, img_save_path,color=(2, 8, 255),label=label_mark)
     print('end')
+
+
+
+
+def make_grid(nx=20,ny=20):
+    '''
+    nx,ny=feature_shape
+    '''
+    yv, xv = np.meshgrid(np.arange(ny), np.arange(nx))
+    grid=np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32) #center point grid
+    return grid
+
+
+def make_anchor_grid(anchors):
+    '''
+    anchor is list,len(anchor)=head_num
+
+    yolov3-tiny anchors:
+        anchors=[[10,14, 23,27, 37,58]  # P4/16
+                ,[81,82, 135,169, 344,319]]  # P5/32
+    
+    feature shape=(bs,na,nx,ny,no)
+        no: number of outputs per anchor, class+confidence+bbx
+        na: number of anchors
+        (nx,ny): feature size
+        bs: batch_size
+
+    '''
+    nl = len(anchors)  # number of detection layers
+    na = len(anchors[0]) // 2  # number of anchors
+    a = np.array(anchors).reshape(nl, -1, 2).astype(np.float32) #anchor reshaped as (nl=2,na=3,2), 2 head,3anchors,2 width/height of anchors
+    anchor_grid=a.reshape(nl, 1, -1, 1, 1, 2) # shape(nl,1,na,1,1,2), align with nl, then 1(for pred_wh broadcast), then na, then (1,1) then 2(width,height)
+    return anchor_grid
+
+
+def center2grid(output,feat_nx,feat_ny,nc,anchors,stride):
+    bs=1 #batch_size
+    nl=len(anchors) #num head
+    na=len(anchors[0])//2 #num anchor
+    no=nc+5 #num output
+    anchor_grid=make_anchor_grid(anchors)
+    print('anchor_gird.shape ',anchor_grid.shape)
+    grid=[[]]*nl
+    z=[]
+    for i in range(nl):
+        y=output.reshape(bs,na,feat_ny[i],feat_nx[i],no) #reshape onnx_sim back to (bs,na,ny,nx,no)
+        grid[i]=make_grid(feat_nx[i],feat_ny[i])
+        print('grid[i].shape ',grid[i].shape)
+
+        y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * stride[i]  # xy
+        y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
+
+        z.append(y.view(bs, na*feat_ny[i]*feat_nx[i], no))
+        
+    return z
+
+
 
 
 if __name__=="__main__":
