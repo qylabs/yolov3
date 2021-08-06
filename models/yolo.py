@@ -67,7 +67,8 @@ class Detect(nn.Module):
     #                 y = torch.cat((xy, wh, y[..., 4:]), -1)
     #             z.append(y.view(bs, -1, self.no))
 
-    #     return x if self.training else (torch.cat(z, 1), x)
+    #     # return x if self.training else (torch.cat(z, 1), x)
+    #     return torch.cat(z, 1)
 
     def forward(self, x):
         #try for onnx export
@@ -80,7 +81,7 @@ class Detect(nn.Module):
             x[i]=x[i].view(bs,self.na,self.no,ny*nx).permute(0,1,3,2).contiguous() #to move self.no to end  (na,no,ny*nx)->(na,ny*nx,no)
 
             z.append(x[i].view(bs, self.na*ny*nx, self.no))
-        return torch.cat(z,1)
+        return z
 
 
     @staticmethod
