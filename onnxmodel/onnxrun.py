@@ -323,7 +323,8 @@ def yolo_proc_simp(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thre
     input_array=transfrom_img(img_path,gray_input=True)
     print(input_array.shape)
     out=onnxrun(onnx_path,input_array) #onnx-graph has only 1 output
-    # print('onnx out.shape ',len(out))
+    print('onnx out.shape ',len(out))
+
     #postproc 
     #1. center2grid of onnx_sim_2H model
     feat_nx=[int(input_shape[1]/s) for s in strides]
@@ -332,7 +333,49 @@ def yolo_proc_simp(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thre
     out=center2grid(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
     # print('==>>final out.shape',out.shape)
     
-    #2. nms out
+    # #2. nms out
+    # pred = non_max_suppression(out, conf_thres,iou_thres)
+    # print('pred_nms ',pred)
+
+    # # #plot
+    # img_save_path=img_path+'.jpg'
+    # print(img_save_path)
+    # for i, det in enumerate(pred):  # detections per image
+    #     print(i,', det',det)
+    #     for *xyxy, conf, cls in det:
+    #         # print('xyxy ',xyxy)
+    #         c = int(cls)  # integer class
+    #         label_mark=f'{c}-{conf:.2f}'
+    #         # print('label_mark ',label_mark)
+    #         plot_one_box(xyxy, img0, img_save_path,color=(2, 8, 255),label=label_mark)
+    # print('end')
+
+
+def yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thres=0.45):
+    '''
+    single one img
+    '''
+    img0=cv2.imread(img_path)
+    input_shape=img0.shape
+    # print('input_shape',input_shape)
+    #preproc img
+    input_array=transfrom_img(img_path,gray_input=True)
+    print(input_array.shape)
+    out1=onnxrun(onnx_path,input_array) #onnx-graph has only 1 output
+    np.set_printoptions(threshold=np.inf)
+    print('onnx out1.shape ',len(out1),out1[0])
+    print("out[0].min() ",out1[0].min())
+
+    out=[out1[0][:,:240,:],out1[0][:,240:,:]]
+    #postproc 
+    #1. center2grid of onnx_sim_2H model
+    feat_nx=[int(input_shape[1]/s) for s in strides]
+    feat_ny=[int(input_shape[0]/s) for s in strides]
+    # print('feat_nx,feat_ny ',feat_nx,feat_ny)
+    out=center2grid(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
+    print('==>>final out.shape',out.shape)
+    
+    # #2. nms out
     pred = non_max_suppression(out, conf_thres,iou_thres)
     print('pred_nms ',pred)
 
@@ -378,7 +421,8 @@ if __name__=="__main__":
     # yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45)
     
     print("==============================")
-    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp_2H.onnx'
-    yolo_proc_simp(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
+    # onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp_2H.onnx'
+    # yolo_proc_simp(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
 
-    
+    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp.onnx'
+    yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
