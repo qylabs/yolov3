@@ -86,7 +86,7 @@ def plot_one_box(x, im, img_save_path,color=(128, 128, 128), label=None, line_th
     tl = line_thickness or round(0.002 * (im.shape[0] + im.shape[1]) / 2) + 1  # line/font thickness
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(im, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
-    print('c1,c2',c1,c2)
+    print('bbox c1,c2',c1,c2)
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
@@ -233,11 +233,11 @@ def yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45):
     input_array=transfrom_img(img_path,gray_input=True)
     print(input_array.shape)
     out=onnxrun(onnx_path,input_array)[0] #onnx-graph has only 1 output
-    print('out.shape ',out.shape)
+    # print('==>>out.shape ',out.shape)
     #postproc 
     #nms out
     pred = non_max_suppression(out, conf_thres,iou_thres)
-    print('pred_nms ',pred)
+    print('==>>pred_nms ',pred)
 
     #plot
     img_save_path=img_path+'.jpg'
@@ -260,8 +260,8 @@ def make_grid(nx=20,ny=20):
     '''
     nx,ny=feature_shape
     '''
-    yv, xv = np.meshgrid(np.arange(ny), np.arange(nx))
-    grid=np.stack((xv, yv), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32) #center point grid
+    yv, xv = np.meshgrid(np.arange(ny), np.arange(nx)) #np.meshgrid result is transpose of torch.meshgrid
+    grid=np.stack((xv.T, yv.T), 2).reshape((1, 1, ny, nx, 2)).astype(np.float32) #center point grid
     return grid
 
 
@@ -296,14 +296,14 @@ def center2grid(output,feat_nx,feat_ny,nc,anchors,strides):
     na=len(anchors[0])//2 #num anchor
     no=nc+5 #num output
     anchor_grid=make_anchor_grid(anchors)
-    print('anchor_gird.shape ',anchor_grid.shape)
+    # print('anchor_gird.shape ',anchor_grid.shape)
 
     grid=[[]]*nl
     z=[]
     for i in range(nl):
         y=output[i].reshape(bs,na,feat_ny[i],feat_nx[i],no) #reshape onnx_sim back to (bs,na,ny,nx,no)
         grid[i]=make_grid(feat_nx[i],feat_ny[i])
-        print('grid[i].shape ',grid[i].shape)
+        # print('grid[i].shape ',grid[i].shape,grid)
         y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * strides[i]  # xy
         y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
 
@@ -318,34 +318,34 @@ def yolo_proc_simp(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thre
     '''
     img0=cv2.imread(img_path)
     input_shape=img0.shape
-    print('input_shape',input_shape)
+    # print('input_shape',input_shape)
     #preproc img
     input_array=transfrom_img(img_path,gray_input=True)
     print(input_array.shape)
     out=onnxrun(onnx_path,input_array) #onnx-graph has only 1 output
-    print('out.shape ',len(out),out)
+    # print('onnx out.shape ',len(out))
     #postproc 
     #1. center2grid of onnx_sim_2H model
     feat_nx=[int(input_shape[1]/s) for s in strides]
     feat_ny=[int(input_shape[0]/s) for s in strides]
-    print('feat_nx,feat_ny ',feat_nx,feat_ny)
+    # print('feat_nx,feat_ny ',feat_nx,feat_ny)
     out=center2grid(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
-    print('out.shape',out.shape,out)
+    # print('==>>final out.shape',out.shape)
     
     #2. nms out
     pred = non_max_suppression(out, conf_thres,iou_thres)
     print('pred_nms ',pred)
 
-    #plot
+    # #plot
     img_save_path=img_path+'.jpg'
     print(img_save_path)
     for i, det in enumerate(pred):  # detections per image
         print(i,', det',det)
         for *xyxy, conf, cls in det:
-            print('xyxy ',xyxy)
+            # print('xyxy ',xyxy)
             c = int(cls)  # integer class
             label_mark=f'{c}-{conf:.2f}'
-            print('label_mark ',label_mark)
+            # print('label_mark ',label_mark)
             plot_one_box(xyxy, img0, img_save_path,color=(2, 8, 255),label=label_mark)
     print('end')
 
@@ -355,8 +355,8 @@ if __name__=="__main__":
     # onnx_path='./weights/yolov3-tiny_sim.onnx'
     # onnx_path='./weights/yolov3-tiny_sim_relu.onnx'
     # onnx_path='./weights/onnx_model_zoo/tiny-yolov3-11.onnx'
-    # onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_org.onnx'
-    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp_2H.onnx'
+    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_org.onnx'
+    
 
     img_path='./img_OUT_0_resize.ppm'
 
@@ -377,7 +377,8 @@ if __name__=="__main__":
 
     # yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45)
     
-    
+    print("==============================")
+    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp_2H.onnx'
     yolo_proc_simp(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
 
     
