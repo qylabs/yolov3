@@ -7,6 +7,7 @@ strides=[16,32] #
 anchors=[[10,14, 23,27, 37,58]  # P4/16
         ,[81,82, 135,169, 344,319]]  # P5/32
 
+np.set_printoptions(threshold=np.inf)
 
 def NMS(dets,threshold):
     '''
@@ -361,6 +362,7 @@ def yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_t
     #preproc img
     input_array=transfrom_img(img_path,gray_input=True)
     print(input_array.shape)
+    print('yolo_1H ==>> input: ',input_array)
     out1=onnxrun(onnx_path,input_array) #onnx-graph has only 1 output
     np.set_printoptions(threshold=np.inf)
     print('onnx out1.shape ',len(out1),out1[0])
@@ -393,12 +395,106 @@ def yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_t
     print('end')
 
 
+def sigmoid(x):
+    s = 1 / (1 + np.exp(-x))
+    return s
+
+
+def center2grid2(output,feat_nx,feat_ny,nc,anchors,strides):
+    '''
+    output[i]=(bs,na*no,feat_ny[i],feat_nx[i])
+
+    reshape+trasnpose+sigmoid
+
+    len(output)==nl
+    '''
+    bs=1 #batch_size
+    nl=len(anchors) #num head
+    na=len(anchors[0])//2 #num anchor
+    no=nc+5 #num output
+    anchor_grid=make_anchor_grid(anchors)
+    print('anchor_gird.shape ',anchor_grid.shape)
+    print('anchor_gird\n ',anchor_grid)
+
+    grid=[[]]*nl
+    z=[]
+    for i in range(nl):
+        tmp=np.ascontiguousarray(output[i].reshape(bs,na,no,feat_ny[i],feat_nx[i]).transpose((0,1,3,4,2)))
+        print(i,', tmp.shape ',tmp.shape)
+        print('after reshape and transpose ')
+        tmp=sigmoid(tmp)
+        print(i, ', tmp after sigmoid \n',tmp)
+
+        y=tmp
+        grid[i]=make_grid(feat_nx[i],feat_ny[i])
+        print('grid[i].shape ',grid[i].shape,grid)
+        print("before y[..., 0:2]=",y[..., 0:2])
+        print("before y[..., 2:4]=",y[..., 2:4])
+
+        y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * strides[i]  # xy
+        y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
+        print("after y[..., 0:2]=",y[..., 0:2])
+        print("after y[..., 2:4]=",y[..., 2:4])
+        
+        z.append(y.reshape(bs, na*feat_ny[i]*feat_nx[i], no))
+        
+    return np.concatenate(z,axis=1)
+
+
+
+def yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thres=0.45):
+    '''
+    2Head output noreshape_nosigmoid
+    sigmoid reshape happened here
+    '''
+    img0=cv2.imread(img_path)
+    input_shape=img0.shape
+    # print('input_shape',input_shape)
+    #preproc img
+    input_array=transfrom_img(img_path,gray_input=True)
+    print(input_array.shape)
+    out=onnxrun(onnx_path,input_array) #onnx-graph has only 1 output
+    print('==>> 2H output onnx out.shape ',len(out))
+    print("out[0].shape, out[1].shape ",out[0].shape, out[1].shape)
+    # print("out[0]==\n",out[0])
+    # print("out[1]==\n",out[1])
+    
+
+    #postproc 
+    #0. reshape+sigmoid
+    #1. center2grid of onnx_sim_2H model
+    feat_nx=[int(input_shape[1]/s) for s in strides]
+    feat_ny=[int(input_shape[0]/s) for s in strides]
+    # print('feat_nx,feat_ny ',feat_nx,feat_ny)
+    out=center2grid2(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
+    print('==>>final out.shape',out.shape)
+    print("out ",out)
+    
+    #2. nms out
+    pred = non_max_suppression(out, conf_thres,iou_thres)
+    print('pred_nms ',pred)
+
+    # #plot
+    img_save_path=img_path+'.jpg'
+    print(img_save_path)
+    for i, det in enumerate(pred):  # detections per image
+        print(i,', det',det)
+        for *xyxy, conf, cls in det:
+            # print('xyxy ',xyxy)
+            c = int(cls)  # integer class
+            label_mark=f'{c}-{conf:.2f}'
+            # print('label_mark ',label_mark)
+            plot_one_box(xyxy, img0, img_save_path,color=(2, 8, 255),label=label_mark)
+    print('end')
+
+
+
 
 if __name__=="__main__":
     # onnx_path='./weights/yolov3-tiny_sim.onnx'
     # onnx_path='./weights/yolov3-tiny_sim_relu.onnx'
     # onnx_path='./weights/onnx_model_zoo/tiny-yolov3-11.onnx'
-    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_org.onnx'
+    # onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_org.onnx'
     
 
     img_path='./img_OUT_0_resize.ppm'
@@ -420,9 +516,14 @@ if __name__=="__main__":
 
     # yolo_proc(img_path,onnx_path,conf_thres=0.2,iou_thres=0.45)
     
-    print("==============================")
+    # print("==============================")
     # onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp_2H.onnx'
     # yolo_proc_simp(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
 
-    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best_simp.onnx'
-    yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
+    # onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/best.onnx'
+    # yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
+
+    print("==============================")
+    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/yolov3_tiny3_gray_noreshap_nosigmoid.onnx'
+    yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
+
