@@ -1,6 +1,7 @@
 import numpy as np
 import onnxruntime as ort
 import cv2
+import copy
 
 strides=[16,32] #
 
@@ -108,10 +109,10 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
     assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
     assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
 
-    nc = prediction.shape[2] - 5  # number of classes
+    # nc = prediction.shape[2] - 5  # number of classes
+    nc=5
     xc = prediction[..., 4] > conf_thres  # candidates
     # prediction=prediction[xc] #filter out low confidence
-    print('prediction.shape ',prediction.shape)
     
     # Settings
     min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
@@ -128,7 +129,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
         # print('0 x.shape',x.shape)
         x = x[xc[xi]]  # confidence
-
+        print('1 x=',x)
         # Cat apriori labels if autolabelling
         # if labels and len(labels[xi]):
         #     l = labels[xi]
@@ -157,7 +158,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
             x = np.concatenate((box, conf, j.astype(conf.dtype)), 1)
             conf_mask=x[:,4]>conf_thres
             x=x[conf_mask]
-
+        print('2x',x)
         # Filter by class
         if classes is not None:
             x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
@@ -172,7 +173,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
             continue
         elif n > max_nms:  # excess boxes
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
-
+        
         # Batched NMS
         # c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         # boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
@@ -420,25 +421,92 @@ def center2grid2(output,feat_nx,feat_ny,nc,anchors,strides):
     z=[]
     for i in range(nl):
         tmp=np.ascontiguousarray(output[i].reshape(bs,na,no,feat_ny[i],feat_nx[i]).transpose((0,1,3,4,2)))
-        print(i,', tmp.shape ',tmp.shape)
-        print('after reshape and transpose ')
+        # print(i,', tmp.shape ',tmp.shape)
+        # print('after reshape and transpose ')
         tmp=sigmoid(tmp)
-        print(i, ', tmp after sigmoid \n',tmp)
+        # print(i, ', tmp after sigmoid \n',tmp)
 
         y=tmp
         grid[i]=make_grid(feat_nx[i],feat_ny[i])
-        print('grid[i].shape ',grid[i].shape,grid)
-        print("before y[..., 0:2]=",y[..., 0:2])
-        print("before y[..., 2:4]=",y[..., 2:4])
+        # print('grid[i].shape ',grid[i].shape,grid)
+        # print("before y[..., 0:2]=",y[..., 0:2])
+        # print("before y[..., 2:4]=",y[..., 2:4])
 
         y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * strides[i]  # xy
         y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
-        print("after y[..., 0:2]=",y[..., 0:2])
-        print("after y[..., 2:4]=",y[..., 2:4])
+        # print("after y[..., 0:2]=",y[..., 0:2])
+        # print("after y[..., 2:4]=",y[..., 2:4])
         
         z.append(y.reshape(bs, na*feat_ny[i]*feat_nx[i], no))
         
     return np.concatenate(z,axis=1)
+
+def center2grid2_iter(output,feat_nx,feat_ny,nc,anchors,strides):
+    '''
+    output[i]=(bs,na*no,feat_ny[i],feat_nx[i])
+
+    reshape+trasnpose+sigmoid
+
+    len(output)==nl
+    '''
+    bs=1 #batch_size
+    nl=len(anchors) #num head
+    na=len(anchors[0])//2 #num anchor
+    no=nc+5 #num output
+    anchor_grid=make_anchor_grid(anchors)
+    # print('anchor_gird.shape ',anchor_grid.shape)
+    # print('anchor_gird\n ',anchor_grid)
+    feat_nx0=copy.deepcopy(feat_nx)
+    feat_ny0=copy.deepcopy(feat_ny)
+    
+    z=[]
+    
+    out=[]
+    for i in range(nl):
+        print('================idx=',i)
+        output_flat=output[i].flatten() #align with c code
+        feat_nx=int(feat_nx0[i])
+        feat_ny=int(feat_ny0[i])
+        feat_map=feat_nx*feat_ny
+        print('feat_map=',feat_map)
+        # print('after sigmoid out_sigmoid=',sigmoid(output_flat))
+        for a in range(na):
+            for feat in range(feat_map):
+                # print(">>>a=",a,', feat=',feat)
+                max_cls=0
+                cls_out=0
+                for o in range(5,no):
+                    tmp_cls=output_flat[a*no*feat_map+o*feat_map+feat]
+                    if tmp_cls>max_cls:
+                        max_cls=tmp_cls
+                        cls_out=o-5
+                        # print('cls ',cls_out)
+                score=sigmoid(output_flat[a*no*feat_map+4*feat_map+feat])* \
+                        sigmoid(output_flat[a*no*feat_map+(cls_out+5)*feat_map+feat])
+                # print('score=',score)
+                # if score>0.1:
+                    # print('candicate score=',score)
+                # print('x idx=',a*no*feat_map+0*feat_map+feat)
+                x=sigmoid(output_flat[a*no*feat_map+0*feat_map+feat])
+                y=sigmoid(output_flat[a*no*feat_map+1*feat_map+feat])
+                # print("before x=",x,", y=",y)
+                grid_x_shift=feat%feat_nx
+                grid_y_shift=feat//feat_nx
+                # print('grid_x_shift=',grid_x_shift,', grid_y_shift=',grid_y_shift)
+                x=(x*2-0.5+grid_x_shift)*strides[i]
+                y=(y*2-0.5+grid_y_shift)*strides[i]
+                # print('final x=',x,', final y=',y)
+
+                w=sigmoid(output_flat[a*no*feat_map+2*feat_map+feat])
+                h=sigmoid(output_flat[a*no*feat_map+3*feat_map+feat])
+                # print("before w=",w,", h=",h)
+                w=w*w*4*anchors[i][2*a+0]
+                h=h*h*4*anchors[i][2*a+1]
+                # print('final w=',w,', final h=',h)
+                z.append([x,y,w,h,score,cls_out])
+        # print('len(z)=',len(z))
+        
+    return np.concatenate(z)
 
 
 
@@ -466,19 +534,26 @@ def yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc,
     feat_nx=[int(input_shape[1]/s) for s in strides]
     feat_ny=[int(input_shape[0]/s) for s in strides]
     # print('feat_nx,feat_ny ',feat_nx,feat_ny)
-    out=center2grid2(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
-    print('==>>final out.shape',out.shape)
-    print("out ",out)
-    
+    # out1=center2grid2(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
+    # print('==>>final out1.shape',out1.shape)
+    # print("out1 ",out1)
+    # out=out1
+
+    # print("===================Second method====================")
+    out2=center2grid2_iter(out,feat_nx,feat_ny,nc,anchors,strides).reshape(300,-1) #obtain the pred
+    print('==>>final out2.shape',out2.shape)
+    print("out2 ",out2)
+    out=out2
+
     #2. nms out
     pred = non_max_suppression(out, conf_thres,iou_thres)
-    print('pred_nms ',pred)
+    # print('pred_nms ',pred)
 
     # #plot
     img_save_path=img_path+'.jpg'
     print(img_save_path)
     for i, det in enumerate(pred):  # detections per image
-        print(i,', det',det)
+        # print(i,', det',det)
         for *xyxy, conf, cls in det:
             # print('xyxy ',xyxy)
             c = int(cls)  # integer class
