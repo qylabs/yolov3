@@ -99,7 +99,7 @@ def plot_one_box(x, im, img_save_path,color=(128, 128, 128), label=None, line_th
     cv2.imwrite(img_save_path,im)
 
 def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None, agnostic=False, multi_label=False,
-                        labels=(), max_det=300):
+                        labels=(), max_det=300,iter=False):
     """Runs Non-Maximum Suppression (NMS) on inference results
 
     Returns:
@@ -113,7 +113,8 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
     nc=5
     xc = prediction[..., 4] > conf_thres  # candidates
     # prediction=prediction[xc] #filter out low confidence
-    
+    # print('xc=',xc)
+    # print('xc true',np.argwhere(xc))
     # Settings
     min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
     max_nms = 3000  # maximum number of boxes
@@ -129,7 +130,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
         # print('0 x.shape',x.shape)
         x = x[xc[xi]]  # confidence
-        print('1 x=',x)
+        # print('1 x=',x)
         # Cat apriori labels if autolabelling
         # if labels and len(labels[xi]):
         #     l = labels[xi]
@@ -143,22 +144,26 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.45, classes=None
         if not x.shape[0]:
             continue
         # print('1 x.shape ',x.shape)
-        # Compute conf
-        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
-        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
-        box = xywh2xyxy(x[:, :4])
 
-        # Detections matrix nx6 (xyxy, conf, cls)
-        if multi_label:
-            i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
-        else:  # best class only
-            conf = x[:, 5:].max(1, keepdims=True)
-            j=x[:,5:].argmax(1).reshape(conf.shape) #cls num
-            x = np.concatenate((box, conf, j.astype(conf.dtype)), 1)
-            conf_mask=x[:,4]>conf_thres
-            x=x[conf_mask]
-        print('2x',x)
+        if iter:
+            x[:,:4] = xywh2xyxy(x[:, :4])
+        else:
+            # Compute conf
+            x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
+            # Box (center x, center y, width, height) to (x1, y1, x2, y2)
+            box = xywh2xyxy(x[:, :4])
+
+            # Detections matrix nx6 (xyxy, conf, cls)
+            if multi_label:
+                i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
+                x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+            else:  # best class only
+                conf = x[:, 5:].max(1, keepdims=True)
+                j=x[:,5:].argmax(1).reshape(conf.shape) #cls num
+                x = np.concatenate((box, conf, j.astype(conf.dtype)), 1)
+                conf_mask=x[:,4]>conf_thres
+                x=x[conf_mask]
+        # print('2x',x)
         # Filter by class
         if classes is not None:
             x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
@@ -441,8 +446,11 @@ def center2grid2(output,feat_nx,feat_ny,nc,anchors,strides):
         
     return np.concatenate(z,axis=1)
 
-def center2grid2_iter(output,feat_nx,feat_ny,nc,anchors,strides):
+def center2grid2_iter(output,feat_nx,feat_ny,nc,anchors,strides,conf_thred=0.1):
     '''
+    this iter method use 3 for loops to achieve similar center2grid2 method
+    align with nn_gap8_project yolo postproc
+
     output[i]=(bs,na*no,feat_ny[i],feat_nx[i])
 
     reshape+trasnpose+sigmoid
@@ -481,36 +489,41 @@ def center2grid2_iter(output,feat_nx,feat_ny,nc,anchors,strides):
                         max_cls=tmp_cls
                         cls_out=o-5
                         # print('cls ',cls_out)
-                score=sigmoid(output_flat[a*no*feat_map+4*feat_map+feat])* \
-                        sigmoid(output_flat[a*no*feat_map+(cls_out+5)*feat_map+feat])
+                # print('before sigmoid score=',output_flat[a*no*feat_map+4*feat_map+feat],output_flat[a*no*feat_map+(cls_out+5)*feat_map+feat])
+                score=sigmoid(output_flat[a*no*feat_map+4*feat_map+feat])
                 # print('score=',score)
-                # if score>0.1:
+                if score>conf_thred:
                     # print('candicate score=',score)
-                # print('x idx=',a*no*feat_map+0*feat_map+feat)
-                x=sigmoid(output_flat[a*no*feat_map+0*feat_map+feat])
-                y=sigmoid(output_flat[a*no*feat_map+1*feat_map+feat])
-                # print("before x=",x,", y=",y)
-                grid_x_shift=feat%feat_nx
-                grid_y_shift=feat//feat_nx
-                # print('grid_x_shift=',grid_x_shift,', grid_y_shift=',grid_y_shift)
-                x=(x*2-0.5+grid_x_shift)*strides[i]
-                y=(y*2-0.5+grid_y_shift)*strides[i]
-                # print('final x=',x,', final y=',y)
+                    # print('x idx=',a*no*feat_map+0*feat_map+feat)
+                    # print("before sigmoid x=",output_flat[a*no*feat_map+0*feat_map+feat],', y=',output_flat[a*no*feat_map+1*feat_map+feat])
+                    x=sigmoid(output_flat[a*no*feat_map+0*feat_map+feat])
+                    y=sigmoid(output_flat[a*no*feat_map+1*feat_map+feat])
+                    # print("after sigmoid x=",x,", y=",y)
+                    grid_x_shift=feat%feat_nx
+                    grid_y_shift=feat//feat_nx
+                    # print('grid_x_shift=',grid_x_shift,', grid_y_shift=',grid_y_shift)
+                    x=(x*2-0.5+grid_x_shift)*strides[i]
+                    y=(y*2-0.5+grid_y_shift)*strides[i]
+                    # print('final x=',x,', final y=',y)
 
-                w=sigmoid(output_flat[a*no*feat_map+2*feat_map+feat])
-                h=sigmoid(output_flat[a*no*feat_map+3*feat_map+feat])
-                # print("before w=",w,", h=",h)
-                w=w*w*4*anchors[i][2*a+0]
-                h=h*h*4*anchors[i][2*a+1]
-                # print('final w=',w,', final h=',h)
-                z.append([x,y,w,h,score,cls_out])
+
+                    # print("before sigmoid w=",output_flat[a*no*feat_map+2*feat_map+feat],', h=',output_flat[a*no*feat_map+3*feat_map+feat])
+                    w=sigmoid(output_flat[a*no*feat_map+2*feat_map+feat])
+                    h=sigmoid(output_flat[a*no*feat_map+3*feat_map+feat])
+                    # print("after sigmoid w=",w,", h=",h)
+                    w=w*w*4*anchors[i][2*a+0]
+                    h=h*h*4*anchors[i][2*a+1]
+                    # print('final w=',w,', final h=',h)
+
+                    score*=sigmoid(output_flat[a*no*feat_map+(cls_out+5)*feat_map+feat])
+                    z.append([x,y,w,h,score,cls_out])
         # print('len(z)=',len(z))
         
     return np.concatenate(z)
 
 
 
-def yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thres=0.45):
+def yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc,conf_thres=0.2,iou_thres=0.45,iter=False):
     '''
     2Head output noreshape_nosigmoid
     sigmoid reshape happened here
@@ -534,26 +547,27 @@ def yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc,
     feat_nx=[int(input_shape[1]/s) for s in strides]
     feat_ny=[int(input_shape[0]/s) for s in strides]
     # print('feat_nx,feat_ny ',feat_nx,feat_ny)
-    # out1=center2grid2(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
-    # print('==>>final out1.shape',out1.shape)
-    # print("out1 ",out1)
-    # out=out1
-
-    # print("===================Second method====================")
-    out2=center2grid2_iter(out,feat_nx,feat_ny,nc,anchors,strides).reshape(300,-1) #obtain the pred
-    print('==>>final out2.shape',out2.shape)
-    print("out2 ",out2)
-    out=out2
+    if iter is False:
+        out1=center2grid2(out,feat_nx,feat_ny,nc,anchors,strides) #obtain the pred
+        # print('==>>final out1.shape',out1.shape)
+        # print("out1 ",out1)
+        out=out1
+    else:
+        print("===================Second method====================")
+        out2=center2grid2_iter(out,feat_nx,feat_ny,nc,anchors,strides).reshape(1,-1,6) #obtain the pred
+        # print('==>>final out2.shape',out2.shape)
+        # print("out2 ",out2)
+        out=out2
 
     #2. nms out
-    pred = non_max_suppression(out, conf_thres,iou_thres)
+    pred = non_max_suppression(out, conf_thres,iou_thres,iter=iter)
     # print('pred_nms ',pred)
 
     # #plot
     img_save_path=img_path+'.jpg'
     print(img_save_path)
     for i, det in enumerate(pred):  # detections per image
-        # print(i,', det',det)
+        print(i,', det',det)
         for *xyxy, conf, cls in det:
             # print('xyxy ',xyxy)
             c = int(cls)  # integer class
@@ -600,5 +614,5 @@ if __name__=="__main__":
 
     print("==============================")
     onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/yolov3_tiny3_gray_noreshap_nosigmoid.onnx'
-    yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
+    yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45,iter=True)
 

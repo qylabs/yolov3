@@ -75,13 +75,14 @@ class Detect(nn.Module):
         z = []  # inference output
         for i in range(self.nl):
             x[i] = self.m[i](x[i])  # conv
-            x[i] = x[i].sigmoid()
-            bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
+            # x[i] = x[i].sigmoid()
+            # bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             # x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous() #to avoid higher order transform
-            x[i]=x[i].view(bs,self.na,self.no,ny*nx).permute(0,1,3,2).contiguous() #to move self.no to end  (na,no,ny*nx)->(na,ny*nx,no)
+            # x[i]=x[i].view(bs,self.na,self.no,ny*nx).permute(0,1,3,2).contiguous() #to move self.no to end  (na,no,ny*nx)->(na,ny*nx,no)
 
-            z.append(x[i].view(bs, self.na*ny*nx, self.no))
+            z.append(x[i]) #reshape does not work in gap8. remove all reshape
         return z
+        # return torch.cat(z, 1)
 
 
     @staticmethod
