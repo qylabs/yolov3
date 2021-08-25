@@ -21,6 +21,7 @@
 *.json
 *.txt
 *.cache
+*.ppm
 
 *.cfg
 !cfg/yolov3*.cfg
