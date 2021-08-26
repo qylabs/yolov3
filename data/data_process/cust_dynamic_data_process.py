@@ -9,6 +9,22 @@ def renamelabel(label_path):
     for name in labels:
         os.rename(name,name.replace('.xml',''))
 
+def renamelabelidx(label_path):
+    labels=glob(label_path+'/*.txt')
+    for name in labels:
+        with open(name,'r') as f:
+            label_txts=f.readlines()
+        
+        txt_list=[]
+        for txt in label_txts:
+            tmp=txt.split()
+            tmp[0]='0' #rename label as '0' class
+            out=' '.join(tmp)
+            txt_list.append(out)
+
+        with open(name,'w') as f:
+            f.writelines(txt_list)
+
 
 def getLabel(label_path,split_ratio=0.2):
     labels=glob(label_path+'/*.txt')
@@ -52,7 +68,8 @@ if __name__=="__main__":
     target_path_root='/home/xinglong/project/yolov3/data/cust_data_7'
     split_ratio=0.4
 
-    # renamelabel(cust_dataset)#rename orgdatset label.txt  xxx.xml.txt -> xxx.txt
+    renamelabel(cust_dataset)#rename orgdatset label.txt  xxx.xml.txt -> xxx.txt
+    renamelabelidx(cust_dataset)
 
     train_label,val_label=getLabel(cust_dataset,split_ratio)
 
