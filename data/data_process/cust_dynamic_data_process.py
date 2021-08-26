@@ -17,7 +17,7 @@ def renamelabelidx(label_path):
         
         txt_list=[]
         for txt in label_txts:
-            tmp=txt.split()
+            tmp=txt.split(' ')
             tmp[0]='0' #rename label as '0' class
             out=' '.join(tmp)
             txt_list.append(out)
