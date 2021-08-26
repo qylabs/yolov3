@@ -40,7 +40,8 @@ def test(data,
          compute_loss=None,
          half_precision=True,
          is_coco=False,
-         opt=None):
+         opt=None,
+         hyp=None):
     # Initialize/load model and set device
     training = model is not None
     if training:  # called by train.py
@@ -78,7 +79,7 @@ def test(data,
     nc = 1 if single_cls else int(data['nc'])  # number of classes
     iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
     niou = iouv.numel()
-
+    print('data ',data)
     # Logging
     log_imgs = 0
     if wandb_logger and wandb_logger.wandb:
@@ -88,7 +89,7 @@ def test(data,
         if device.type != 'cpu':
             model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
         task = opt.task if opt.task in ('train', 'val', 'test') else 'val'  # path to train/val/test images
-        dataloader = create_dataloader(data[task], imgsz, batch_size, gs, opt, pad=0.5, rect=True,
+        dataloader = create_dataloader(data[task], imgsz, batch_size, gs, opt, hyp=hyp,pad=0.5, rect=True,
                                        prefix=colorstr(f'{task}: '))[0]
 
     seen = 0
@@ -283,6 +284,8 @@ def test(data,
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
+    result_file=save_dir/'results_map50.txt'
+    np.savetxt(result_file,[map50,map],fmt='%10.4g')
     return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
 
 
@@ -306,6 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('--project', default='runs/test', help='save to project/name')
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--hyp', type=str, default=None, help='hyperparameters path')
     opt = parser.parse_args()
     opt.save_json |= opt.data.endswith('coco.yaml')
     opt.data = check_file(opt.data)  # check file
@@ -313,21 +317,27 @@ if __name__ == '__main__':
     check_requirements(exclude=('tensorboard', 'pycocotools', 'thop'))
 
     if opt.task in ('train', 'val', 'test'):  # run normally
+        if opt.hyp:
+            with open(opt.hyp) as f:
+                hyp = yaml.safe_load(f)  # load hyps
+        
         test(opt.data,
-             opt.weights,
-             opt.batch_size,
-             opt.img_size,
-             opt.conf_thres,
-             opt.iou_thres,
-             opt.save_json,
-             opt.single_cls,
-             opt.augment,
-             opt.verbose,
-             save_txt=opt.save_txt | opt.save_hybrid,
-             save_hybrid=opt.save_hybrid,
-             save_conf=opt.save_conf,
-             opt=opt
-             )
+            opt.weights,
+            opt.batch_size,
+            opt.img_size,
+            opt.conf_thres,
+            opt.iou_thres,
+            opt.save_json,
+            opt.single_cls,
+            opt.augment,
+            opt.verbose,
+            save_txt=opt.save_txt | opt.save_hybrid,
+            save_hybrid=opt.save_hybrid,
+            save_conf=opt.save_conf,
+            opt=opt,
+            hyp=hyp
+            )
+        
 
     elif opt.task == 'speed':  # speed benchmarks
         for w in opt.weights:
