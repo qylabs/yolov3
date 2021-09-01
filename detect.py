@@ -12,10 +12,15 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path, save_one_box
 from utils.plots import colors, plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
-
+from sort import *
 
 @torch.no_grad()
 def detect(opt):
+    if opt.track:
+        mot_tracker = Sort(max_age=opt.max_age, 
+                            min_hits=opt.min_hits,
+                            iou_threshold=opt.iou_match_threshold) #create instance of the SORT tracker
+    
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -66,11 +71,10 @@ def detect(opt):
 
         # Inference
         t1 = time_synchronized()
-        pred = model(img, augment=opt.augment)[0]
-
+        pred = model(img, augment=opt.augment)[0] #batched result pred,batch=1
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, opt.classes, opt.agnostic_nms,
-                                   max_det=opt.max_det)
+                                   max_det=opt.max_det)# after nms got [pred per image], len=batch_size=1
         t2 = time_synchronized()
 
         # Apply Classifier
@@ -78,7 +82,7 @@ def detect(opt):
             pred = apply_classifier(pred, modelc, img, im0s)
 
         # Process detections
-        for i, det in enumerate(pred):  # detections per image
+        for i, det in enumerate(pred):  # detections per image #det in pred is *xyxy, conf, cls
             if webcam:  # batch_size >= 1
                 p, s, im0, frame = path[i], f'{i}: ', im0s[i].copy(), dataset.count
             else:
@@ -86,13 +90,21 @@ def detect(opt):
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
+            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_stream')  # img.txt
             s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if opt.save_crop else im0  # for opt.save_crop
+
+            if len(det)==0 and opt.track:
+                trackers = mot_tracker.update() #update with empty tracker
+            
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+
+                if opt.track:
+                    dets=det[:,:-1].clone().numpy()
+                    trackers = mot_tracker.update(dets) #np array([x1,y1,x2,y2,trk.id+1])
 
                 # Print results
                 for c in det[:, -1].unique():
@@ -103,7 +115,7 @@ def detect(opt):
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
+                        line = (*xywh, conf,cls) if dataset.mode == 'image' else (frame,*xywh, conf,cls) #attach frame number to result of _stream.txt
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
@@ -113,6 +125,10 @@ def detect(opt):
                         plot_one_box(xyxy, im0, label=label, color=colors(c, True), line_thickness=opt.line_thickness)
                         if opt.save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                if save_txt and opt.track:
+                    with open(txt_path + '_track.txt','a') as out_file:
+                        for d in trackers:
+                            print('%d,%d,%.4f,%.4f,%.4f,%.4f'%(frame,d[4],(d[0]+d[2])/2/gn[0],(d[1]+d[3])/2/gn[1],(d[2]-d[0])/gn[2],(d[3]-d[1])/gn[3]),file=out_file)#write to file, [frame,id,x1,y1,w,h,]
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({t2 - t1:.3f}s)')
@@ -172,6 +188,15 @@ if __name__ == '__main__':
     parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
+    ######tracking config#######
+    parser.add_argument('--track', action='store_true', help='track the video imgs')
+    parser.add_argument("--max_age", 
+                        help="Maximum number of frames to keep alive a track without associated detections.", 
+                        type=int, default=1)
+    parser.add_argument("--min_hits", 
+                        help="Minimum number of associated detections before track is initialised.", 
+                        type=int, default=3)
+    parser.add_argument("--iou_match_threshold", help="Minimum IOU for match.", type=float, default=0.3)
     opt = parser.parse_args()
     print(opt)
     check_requirements(exclude=('tensorboard', 'pycocotools', 'thop'))

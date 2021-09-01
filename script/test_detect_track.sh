@@ -20,4 +20,6 @@ SOURCE=data/cust_data/
 python3 detect.py --source ${SOURCE} \
                   --weights ${WEIGHTS} \
                   --conf 0.2 \
-                  --img-size 320
+                  --img-size 320 \
+                  --track \
+                  --save-txt
