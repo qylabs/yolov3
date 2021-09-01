@@ -125,11 +125,16 @@ def detect(opt):
                         plot_one_box(xyxy, im0, label=label, color=colors(c, True), line_thickness=opt.line_thickness)
                         if opt.save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
-                if save_txt and opt.track:
-                    with open(txt_path + '_track.txt','a') as out_file:
-                        for d in trackers:
-                            print('%d,%d,%.4f,%.4f,%.4f,%.4f'%(frame,d[4],(d[0]+d[2])/2/gn[0],(d[1]+d[3])/2/gn[1],(d[2]-d[0])/gn[2],(d[3]-d[1])/gn[3]),file=out_file)#write to file, [frame,id,x1,y1,w,h,]
+                if opt.track:
+                    for d in trackers:
+                        if save_txt:
+                            with open(txt_path + '_track.txt','a') as out_file:
+                                print('%d,%d,%.4f,%.4f,%.4f,%.4f'%(frame,d[4],(d[0]+d[2])/2/gn[0],(d[1]+d[3])/2/gn[1],(d[2]-d[0])/gn[2],(d[3]-d[1])/gn[3]),file=out_file)#write to file, [frame,id,x1,y1,w,h,]
 
+                        if save_img:
+                            c1, c2 = (int(d[0]), int(d[1])), (int(d[2]), int(d[3]))
+                            cv2.putText(im0, 'id'+str(int(d[4])), (c1[0], c1[1]-10), 0, opt.line_thickness/2, [255, 0, 0], thickness=opt.line_thickness, lineType=cv2.LINE_AA)
+            
             # Print time (inference + NMS)
             print(f'{s}Done. ({t2 - t1:.3f}s)')
 
@@ -185,9 +190,9 @@ if __name__ == '__main__':
     parser.add_argument('--project', default='runs/detect', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-    parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
+    parser.add_argument('--line-thickness', default=1, type=int, help='bounding box thickness (pixels)')
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
-    parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
+    parser.add_argument('--hide-conf', default=True, action='store_true', help='hide confidences')
     ######tracking config#######
     parser.add_argument('--track', action='store_true', help='track the video imgs')
     parser.add_argument("--max_age", 
