@@ -22,4 +22,6 @@ python3 detect.py --source ${SOURCE} \
                   --conf 0.2 \
                   --img-size 320 \
                   --track \
-                  --save-txt
+                  --save-txt \
+                  --max_age 3 \
+                  --iou_match_threshold 0.1

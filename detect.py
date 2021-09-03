@@ -95,6 +95,8 @@ def detect(opt):
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if opt.save_crop else im0  # for opt.save_crop
 
+            # ##filter only class 0
+            # det=det[det[:,-1]==0]
             if len(det)==0 and opt.track:
                 trackers = mot_tracker.update() #update with empty tracker
             
