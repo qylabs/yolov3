@@ -9,17 +9,21 @@ import torch.backends.cudnn as cudnn
 import torchvision
 
 from model import Net
+from modellib import build_model
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir",default='data',type=str)
+parser.add_argument("--model-name",default='',type=str,help="model name")
 parser.add_argument("--no-cuda",action="store_true")
 parser.add_argument("--gpu-id",default=0,type=int)
 parser.add_argument("--lr",default=0.1, type=float)
+parser.add_argument("--epochs",default=20,type=int)
 parser.add_argument("--interval",'-i',default=20,type=int)
 parser.add_argument('--resume', '-r',action='store_true')
 parser.add_argument('--checkpoint', type=str, help="checkpoint path")
+parser.add_argument('--save-model', type=str, help="save model path")
 args = parser.parse_args()
-
+print('args ',args)
 # device
 device = "cuda:{}".format(args.gpu_id) if torch.cuda.is_available() and not args.no_cuda else "cpu"
 if torch.cuda.is_available() and not args.no_cuda:
@@ -53,7 +57,14 @@ num_classes = max(len(trainloader.dataset.classes), len(testloader.dataset.class
 
 # net definition
 start_epoch = 0
-net = Net(num_classes=num_classes)
+if args.model_name:
+    print('use model: ',args.model_name)
+    net=build_model(args.model_name,num_classes=num_classes, pretrained=True)
+else:
+    net = Net(num_classes=num_classes)
+
+print('net ',net)
+
 if args.resume:
     assert os.path.isfile(args.checkpoint), "Error: no checkpoint file found!"
     print('Loading from ',args.checkpoint)
@@ -136,7 +147,7 @@ def test(epoch):
     acc = 100.*correct/total
     if acc > best_acc:
         best_acc = acc
-        print("Saving parameters to checkpoint/ckpt.t7")
+        print("Saving parameters to checkpoint")
         checkpoint = {
             'net_dict':net.state_dict(),
             'acc':acc,
@@ -144,7 +155,7 @@ def test(epoch):
         }
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
-        torch.save(checkpoint, './checkpoint/ckpt.t7')
+        torch.save(checkpoint, os.path.join('./checkpoint',args.save_model))
 
     return test_loss/len(testloader), 1.- correct/total
 
@@ -169,7 +180,7 @@ def draw_curve(epoch, train_loss, train_err, test_loss, test_err):
     if epoch == 0:
         ax0.legend()
         ax1.legend()
-    fig.savefig("train.jpg")
+    fig.savefig("train1.jpg")
 
 # lr decay
 def lr_decay():
@@ -180,7 +191,7 @@ def lr_decay():
         print("Learning rate adjusted to {}".format(lr))
 
 def main():
-    for epoch in range(start_epoch, start_epoch+40):
+    for epoch in range(start_epoch, start_epoch+args.epochs):
         train_loss, train_err = train(epoch)
         test_loss, test_err = test(epoch)
         draw_curve(epoch, train_loss, train_err, test_loss, test_err)
