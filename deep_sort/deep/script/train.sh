@@ -7,6 +7,6 @@ SAVE_MODEL=resnet18.pth
 python train.py --data-dir ${DATA} \
                 --model-name 'resnet18' \
                 --save-model ${SAVE_MODEL} \
-                --epochs 1 
+                --epochs 120
                 # --resume \
                 # --checkpoint ${CHECKPOINT}

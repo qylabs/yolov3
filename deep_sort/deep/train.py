@@ -186,7 +186,7 @@ def draw_curve(epoch, train_loss, train_err, test_loss, test_err):
 def lr_decay():
     global optimizer
     for params in optimizer.param_groups:
-        params['lr'] *= 0.1
+        params['lr'] *= 0.05
         lr = params['lr']
         print("Learning rate adjusted to {}".format(lr))
 
