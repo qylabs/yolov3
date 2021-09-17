@@ -6,12 +6,15 @@ import argparse
 import os
 
 from model import Net
+from modellib import build_model
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir",default='data',type=str)
 parser.add_argument("--gpu-id",default=0,type=int)
 parser.add_argument('--checkpoint', type=str, help="checkpoint path")
 parser.add_argument('--save_feature', type=str,default="features.pth", help="save feature path")
+parser.add_argument("--num_classes",type=int,help="model class number")
+parser.add_argument("--in_channel",default=3,type=int,help="model input channel")
 args = parser.parse_args()
 
 # device
@@ -38,7 +41,12 @@ galleryloader = torch.utils.data.DataLoader(
 )
 
 # net definition
-net = Net(reid=True)
+if args.model_name:
+    print('use model: ',args.model_name)
+    net=build_model(args.model_name,num_classes=args.num_classes, pretrained=True,in_channel=args.in_channel)
+else:
+    net = Net(num_classes=args.num_classes)
+
 assert os.path.isfile(args.checkpoint), "Error: no checkpoint file found!"
 print('Loading weight from ',args.checkpoint)
 checkpoint = torch.load(args.checkpoint)

@@ -89,7 +89,8 @@ def build_model(name,
                 num_classes,
                 loss='softmax',
                 pretrained=True,
-                use_gpu=False):
+                use_gpu=False,
+                **kwargs):
     """A function wrapper for building a model.
 
     Args:
@@ -115,4 +116,5 @@ def build_model(name,
     return __model_factory[name](num_classes=num_classes,
                                  loss=loss,
                                  pretrained=pretrained,
-                                 use_gpu=use_gpu)
+                                 use_gpu=use_gpu,
+                                 **kwargs)

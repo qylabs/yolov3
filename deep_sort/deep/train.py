@@ -22,6 +22,7 @@ parser.add_argument("--interval",'-i',default=20,type=int)
 parser.add_argument('--resume', '-r',action='store_true')
 parser.add_argument('--checkpoint', type=str, help="checkpoint path")
 parser.add_argument('--save-model', type=str, help="save model path")
+parser.add_argument("--in_channel",default=3,type=int,help="model input channel")
 args = parser.parse_args()
 print('args ',args)
 # device
@@ -59,7 +60,7 @@ num_classes = max(len(trainloader.dataset.classes), len(testloader.dataset.class
 start_epoch = 0
 if args.model_name:
     print('use model: ',args.model_name)
-    net=build_model(args.model_name,num_classes=num_classes, pretrained=True)
+    net=build_model(args.model_name,num_classes=num_classes, pretrained=True,in_channel=args.in_channel)
 else:
     net = Net(num_classes=num_classes)
 

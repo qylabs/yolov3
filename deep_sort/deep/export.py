@@ -1,3 +1,4 @@
+import argparse
 import torch
 import torch.nn as nn
 from model import Net
@@ -16,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--opset-version', type=int, default=12, help='ONNX opset version')  # ONNX-only
     parser.add_argument('--img-channel', type=int, default=3, help='input img channel')  # support various img channel
     parser.add_argument("--model-name",default='',type=str,help="model name")
+    parser.add_argument("--num_classes",type=int,help="model class number")
     parser.add_argument('--reid', action='store_true', help='reid case drop classification head')
     args = parser.parse_args()
     device = "cuda:0" if torch.cuda.is_available() else 'cpu'
