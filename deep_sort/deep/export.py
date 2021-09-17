@@ -1,6 +1,7 @@
 import argparse
 import torch
 import torch.nn as nn
+import onnx
 from model import Net
 from modellib import build_model
 
@@ -15,25 +16,25 @@ if __name__ == '__main__':
     parser.add_argument('--dynamic', action='store_true', help='dynamic ONNX axes')  # ONNX-only
     parser.add_argument('--simplify', action='store_true', help='simplify ONNX model')  # ONNX-only
     parser.add_argument('--opset-version', type=int, default=12, help='ONNX opset version')  # ONNX-only
-    parser.add_argument('--img-channel', type=int, default=3, help='input img channel')  # support various img channel
     parser.add_argument("--model-name",default='',type=str,help="model name")
     parser.add_argument("--num_classes",type=int,help="model class number")
-    parser.add_argument('--reid', action='store_true', help='reid case drop classification head')
+    parser.add_argument("--in_channel",default=3,type=int,help="model input channel")
     args = parser.parse_args()
     device = "cuda:0" if torch.cuda.is_available() else 'cpu'
     if args.model_name:
         print('use model: ',args.model_name)
-        model=build_model(args.model_name,num_classes=args.num_classes, pretrained=True)
+        model=build_model(args.model_name,num_classes=args.num_classes, pretrained=True,in_channel=args.in_channel,reid=True)
     else:
-        model = Net(num_classes=args.num_classes)
+        model = Net(num_classes=args.num_classes,reid=True)
 
-    checkpoint = torch.load(args.checkpoint,map_location=device)
+    checkpoint = torch.load(args.weights,map_location=device)
     # import ipdb; ipdb.set_trace()
     net_dict = checkpoint['net_dict']
     model.load_state_dict(net_dict)
     best_acc = checkpoint['acc']
+    print('best_acc: ',best_acc)
 
-    img = torch.randn(args.batch_size, args.img_channel, *args.img_size).to(device)
+    img = torch.randn(args.batch_size, args.in_channel, *args.img_size).to(device)
     # Update model
     if args.half:
         img, model = img.half(), model.half()  # to FP16
@@ -56,6 +57,7 @@ if __name__ == '__main__':
     # Simplify
     if args.simplify:
         import onnxsim
+        print("==simplify==")
         model_onnx, check = onnxsim.simplify(
             model_onnx,
             dynamic_input_shape=args.dynamic,

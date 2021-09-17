@@ -85,11 +85,13 @@ class Net(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.avgpool(x)
+        if self.reid:
+            return x
         x = x.view(x.size(0),-1)
         # B x 128
-        if self.reid:
-            x = x.div(x.norm(p=2,dim=1,keepdim=True))
-            return x
+        # if self.reid:
+        #     x = x.div(x.norm(p=2,dim=1,keepdim=True))
+        #     return x
         # classifier
         x = self.classifier(x)
         return x

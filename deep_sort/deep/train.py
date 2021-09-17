@@ -72,7 +72,7 @@ if args.resume:
     checkpoint = torch.load(args.checkpoint,map_location=device)
     # import ipdb; ipdb.set_trace()
     net_dict = checkpoint['net_dict']
-    net.load_state_dict(net_dict)
+    net.load_state_dict(net_dict,strict=False)
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 net.to(device)
