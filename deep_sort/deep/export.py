@@ -15,45 +15,47 @@ if __name__ == '__main__':
     parser.add_argument('--simplify', action='store_true', help='simplify ONNX model')  # ONNX-only
     parser.add_argument('--opset-version', type=int, default=12, help='ONNX opset version')  # ONNX-only
     parser.add_argument('--img-channel', type=int, default=3, help='input img channel')  # support various img channel
-    opt = parser.parse_args()
-    device = "cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else 'cpu'
+    parser.add_argument("--model-name",default='',type=str,help="model name")
+    parser.add_argument('--reid', action='store_true', help='reid case drop classification head')
+    args = parser.parse_args()
+    device = "cuda:0" if torch.cuda.is_available() else 'cpu'
     if args.model_name:
         print('use model: ',args.model_name)
-        net=build_model(args.model_name,num_classes=num_classes, pretrained=True)
+        model=build_model(args.model_name,num_classes=args.num_classes, pretrained=True)
     else:
-        net = Net(num_classes=num_classes)
+        model = Net(num_classes=args.num_classes)
 
     checkpoint = torch.load(args.checkpoint,map_location=device)
     # import ipdb; ipdb.set_trace()
     net_dict = checkpoint['net_dict']
-    net.load_state_dict(net_dict)
+    model.load_state_dict(net_dict)
     best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
+
+    img = torch.randn(args.batch_size, args.img_channel, *args.img_size).to(device)
     # Update model
-    if opt.half:
+    if args.half:
         img, model = img.half(), model.half()  # to FP16
     
     for _ in range(2):
         y = model(img)  # dry runs
     
     # ONNX export ------------------------------------------------------------------------------------------------------
-    f = opt.weights.replace('.pt', '.onnx')  # filename
-    torch.onnx.export(model, img, f, verbose=False, opset_version=opt.opset_version, input_names=['images'],
-                        training=torch.onnx.TrainingMode.TRAINING if opt.train else torch.onnx.TrainingMode.EVAL,
-                        do_constant_folding=not opt.train,
+    f = args.weights.replace('.pt', '.onnx')  # filename
+    torch.onnx.export(model, img, f, verbose=False, opset_version=args.opset_version, input_names=['images'],
+                        training=torch.onnx.TrainingMode.TRAINING if args.train else torch.onnx.TrainingMode.EVAL,
+                        do_constant_folding=not args.train,
                     #   dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # size(1,3,640,640)
-                    #                 'output': {0: 'batch', 2: 'y', 3: 'x'}} if opt.dynamic else None
-                        dynamic_axes={'images': {0: 'batch'}} if opt.dynamic else None)
+                    #                 'output': {0: 'batch', 2: 'y', 3: 'x'}} if args.dynamic else None
+                        dynamic_axes={'images': {0: 'batch'}} if args.dynamic else None)
 
     # Checks
     model_onnx = onnx.load(f)  # load onnx model
 
     # Simplify
-        if opt.simplify:
-            import onnxsim
-            model_onnx, check = onnxsim.simplify(
-                model_onnx,
-                dynamic_input_shape=opt.dynamic,
-                input_shapes={'images': list(img.shape)} if opt.dynamic else None)
-            assert check, 'assert check failed'
-            onnx.save(model_onnx, f)
+    if args.simplify:
+        import onnxsim
+        model_onnx, check = onnxsim.simplify(
+            model_onnx,
+            dynamic_input_shape=args.dynamic,
+            input_shapes={'images': list(img.shape)} if args.dynamic else None)
+        onnx.save(model_onnx, f)

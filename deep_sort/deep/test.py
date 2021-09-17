@@ -9,12 +9,13 @@ from model import Net
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir",default='data',type=str)
-parser.add_argument("--no-cuda",action="store_true")
 parser.add_argument("--gpu-id",default=0,type=int)
+parser.add_argument('--checkpoint', type=str, help="checkpoint path")
+parser.add_argument('--save_feature', type=str,default="features.pth", help="save feature path")
 args = parser.parse_args()
 
 # device
-device = "cuda:{}".format(args.gpu_id) if torch.cuda.is_available() and not args.no_cuda else "cpu"
+device = "cuda:{}".format(args.gpu_id) if torch.cuda.is_available() else "cpu"
 if torch.cuda.is_available() and not args.no_cuda:
     cudnn.benchmark = True
 
@@ -25,7 +26,7 @@ gallery_dir = os.path.join(root,"gallery")
 transform = torchvision.transforms.Compose([
     torchvision.transforms.Resize((128,64)),
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    # torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 queryloader = torch.utils.data.DataLoader(
     torchvision.datasets.ImageFolder(query_dir, transform=transform),
@@ -38,9 +39,9 @@ galleryloader = torch.utils.data.DataLoader(
 
 # net definition
 net = Net(reid=True)
-assert os.path.isfile("./checkpoint/ckpt.t7"), "Error: no checkpoint file found!"
-print('Loading from checkpoint/ckpt.t7')
-checkpoint = torch.load("./checkpoint/ckpt.t7")
+assert os.path.isfile(args.checkpoint), "Error: no checkpoint file found!"
+print('Loading weight from ',args.checkpoint)
+checkpoint = torch.load(args.checkpoint)
 net_dict = checkpoint['net_dict']
 net.load_state_dict(net_dict, strict=False)
 net.eval()
@@ -65,7 +66,7 @@ with torch.no_grad():
         gallery_features = torch.cat((gallery_features, features), dim=0)
         gallery_labels = torch.cat((gallery_labels, labels))
 
-gallery_labels -= 2
+gallery_labels -= 2 #because gallery include other_not_included_person(-1) and background(0)
 
 # save features
 features = {
@@ -74,4 +75,4 @@ features = {
     "gf": gallery_features,
     "gl": gallery_labels
 }
-torch.save(features,"features.pth")
+torch.save(features,args.save_feature)

@@ -52,10 +52,6 @@ class Market1501:
         if self.market1501_500k:
             required_files.append(self.extra_gallery_dir)
         
-        # train = lambda: self.process_dir(self.train_dir)
-        # query = lambda: self.process_dir(self.query_dir, is_train=False)
-        # gallery = lambda: self.process_dir(self.gallery_dir, is_train=False) + \
-        #                   (self.process_dir(self.extra_gallery_dir, is_train=False) if self.market1501_500k else [])
 
     def process_dir(self, dir_path):
         img_paths = glob.glob(osp.join(dir_path, '*.jpg'))
@@ -63,19 +59,17 @@ class Market1501:
 
         data = []
         for img_path in img_paths:
-            pid, camid = map(int, pattern.search(img_path).groups())
-            if pid == -1:
-                continue  # junk images are just ignored
-            assert 0 <= pid <= 1501  # pid == 0 means background
-            assert 1 <= camid <= 6
-            camid -= 1  # index starts from 0
-            # if is_train:
-            #     pid = self.dataset_name + "_" + str(pid)
-            #     camid = self.dataset_name + "_" + str(camid)
+            pid, camid = map(str, pattern.search(img_path).groups())
+            # if pid == -1:
+            #     continue  # junk images are just ignored
+            # assert 0 <= pid <= 1501  # pid == 0 means background
+            # assert 1 <= camid <= 6
+            # camid -= 1  # index starts from 0
+            
             data.append((img_path, pid, camid))
         return data
     
-    def build_dataset(self,target_path,src_dir):
+    def build_dataset(self,target_path,src_dir,is_train=False):
         if not osp.isdir(target_path):
             os.makedirs(target_path)
         
@@ -84,6 +78,9 @@ class Market1501:
             img_pid_path=osp.join(target_path,str(pid))
             if not osp.isdir(img_pid_path):
                 os.makedirs(img_pid_path)
+                if is_train:
+                    img_pid_path=img_pid_path.replace('train','test')#first image is used as val image
+                    os.makedirs(img_pid_path)
             shutil.copy(img,img_pid_path)
 
         print("Done! at ",target_path)
@@ -93,17 +90,26 @@ class Market1501:
 
 
 if __name__=="__main__":
-    root_path='/home/wangtao/project/deep_sort_pytorch'
+    root_path='/home/wangtao/project/yolov3/deep_sort/deep'
     dataset_dir='data/Market-1501-v15.09.15'
     target_dir=osp.join(root_path,'data/market1501')
 
     data_manager=Market1501(root_path,dataset_dir=dataset_dir)
-
-    target_path_train=osp.join(target_dir,'train')
-    data_manager.build_dataset(target_path_train,data_manager.train_dir)
-
-    target_path_test=osp.join(target_dir,'test')
+    #query
+    target_path_test=osp.join(target_dir,'query')
     data_manager.build_dataset(target_path_test,data_manager.query_dir)
+
+    # # #multi-query
+    # # target_path_train=osp.join(target_dir,'multi-query')
+    # # data_manager.build_dataset(target_path_train,data_manager.gt_bbox)
+
+    #gallery
+    target_path_train=osp.join(target_dir,'gallery')
+    data_manager.build_dataset(target_path_train,data_manager.gallery_dir)
+
+    #train+val
+    target_path_train=osp.join(target_dir,'train')
+    data_manager.build_dataset(target_path_train,data_manager.train_dir,is_train=True)
 
 
 

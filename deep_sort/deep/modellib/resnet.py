@@ -186,6 +186,7 @@ class ResNet(nn.Module):
         last_stride=2,
         fc_dims=None,
         dropout_p=None,
+        in_channel=3,
         **kwargs
     ):
         super(ResNet, self).__init__()
@@ -208,8 +209,11 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
+        # self.conv1 = nn.Conv2d(
+        #     in_channel, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False
+        # )
         self.conv1 = nn.Conv2d(
-            3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False
+            in_channel, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False
         )
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
@@ -242,6 +246,7 @@ class ResNet(nn.Module):
         )
         self.classifier = nn.Linear(self.feature_dim, num_classes)
 
+        self.reid=kwargs.get('reid',None) #add reid method
         self._init_params()
 
         # Zero-initialize the last BN in each residual branch,
