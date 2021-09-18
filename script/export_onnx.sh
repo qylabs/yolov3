@@ -14,4 +14,5 @@ python models/export.py --weights ${WEIGHTS} \
                         --batch-size 1 \
                         --include onnx \
                         --img-channel ${IMG_CHANNEL} \
-                        --simplify  #use onnxsim to simply onnx graph
+                        --simplify \
+                        --onnx_export_simplify

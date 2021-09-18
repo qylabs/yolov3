@@ -57,6 +57,7 @@ def detect(opt):
         dataset = LoadStreams(source, img_size=imgsz, stride=stride)
     else:
         dataset = LoadImages(source, img_size=imgsz, stride=stride)
+        dataset.gray_input=opt.gray_input #This is for img/video src set as gray input to 1channel model
 
     # Run inference
     if device.type != 'cpu':
@@ -204,6 +205,7 @@ if __name__ == '__main__':
                         help="Minimum number of associated detections before track is initialised.", 
                         type=int, default=3)
     parser.add_argument("--iou_match_threshold", help="Minimum IOU for match.", type=float, default=0.3)
+    parser.add_argument('--gray_input', default=False, action='store_true', help='img/video src set as gray_input infer')
     opt = parser.parse_args()
     print(opt)
     check_requirements(exclude=('tensorboard', 'pycocotools', 'thop'))

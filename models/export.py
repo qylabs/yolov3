@@ -36,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--optimize', action='store_true', help='optimize TorchScript for mobile')  # TorchScript-only
     parser.add_argument('--dynamic', action='store_true', help='dynamic ONNX axes')  # ONNX-only
     parser.add_argument('--simplify', action='store_true', help='simplify ONNX model')  # ONNX-only
+    parser.add_argument('--onnx_export_simplify', action='store_true', help='manually simplify model structure for gap8')  # ONNX-only
     parser.add_argument('--opset-version', type=int, default=12, help='ONNX opset version')  # ONNX-only
     parser.add_argument('--img-channel', type=int, default=3, help='input img channel')  # support various img channel
     opt = parser.parse_args()
@@ -79,6 +80,7 @@ if __name__ == '__main__':
         elif isinstance(m, models.yolo.Detect):
             m.inplace = opt.inplace
             m.onnx_dynamic = opt.dynamic
+            m.onnx_export_simplify=opt.onnx_export_simplify
             # m.forward = m.forward_export  # assign forward (optional)
 
     for _ in range(2):
