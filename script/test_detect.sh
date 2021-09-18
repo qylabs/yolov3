@@ -15,10 +15,14 @@
 
 WEIGHTS=runs/train/exp_yolov3_tiny3_gray_WP/weights/best.pt
 # SOURCE=data/WiderPerson_gray/images/val
-SOURCE=data/cust_data/
+# SOURCE=data/cust_data/6_100_results_origin_jpg
+# SOURCE=data/cust_data/7_100_results_origin_jpg
+# SOURCE=data/cust_data/8_100_results_origin_jpg
+SOURCE=data/cust_data/img_3
 
 python3 detect.py --source ${SOURCE} \
                   --weights ${WEIGHTS} \
                   --conf 0.2 \
                   --img-size 320 \
-                  --gray_input
+                  --gray_input \
+                  --save-crop
