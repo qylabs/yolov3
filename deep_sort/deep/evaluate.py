@@ -49,8 +49,8 @@ gf = features["gf"]
 gl = features["gl"]
 
 # scores = qf.mm(gf.t())
-# scores=euclidean_dist(qf,gf) #not work here for model Net
-scores=cosin_dist(qf,gf) #3368*19732
+# scores=euclidean_dist(qf,gf) #
+scores=cosin_dist(qf,gf) #3368*19732. effective for classification model
 top5_similarity,top5_idx=scores.topk(5, dim=1)
 res = top5_idx[:,0] #got top1
 top1correct = gl[res].eq(ql).sum().item()
@@ -66,7 +66,6 @@ print("Acc top1:{:.3f}".format(top1correct/ql.size(0))) #0.985
 
 C2= confusion_matrix(gl[res], ql)
 print("confusion matrix:")
-# print('   0, 1, 2, 3')
 print(C2)
 
 # print('top5 cosin similarity=\n',top5_similarity[res])
@@ -74,9 +73,8 @@ print(C2)
 # print('top5_idx label=\n',gl[top5_idx[res]])
 # print("Acc top5:{:.3f}".format(top5correct/ql.size(0)))
 
-mask_false=torch.where(gl[res]!=ql)[0]
+# mask_false=torch.where(gl[res]!=ql)[0]
 
-print()
 
 
 

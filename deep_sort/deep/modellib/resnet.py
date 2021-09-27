@@ -357,9 +357,9 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         f = self.featuremaps(x)
-        if self.reid:
-            return  f
         v = self.global_avgpool(f)
+        if self.reid:
+            return  v
         v = v.view(v.size(0), -1)
 
         if self.fc is not None:
