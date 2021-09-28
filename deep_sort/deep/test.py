@@ -14,7 +14,7 @@ parser.add_argument("--gpu-id",default=0,type=int)
 parser.add_argument('--checkpoint', type=str, help="checkpoint path")
 parser.add_argument('--save_feature', type=str,default="features.pth", help="save feature path")
 parser.add_argument("--model-name",default='',type=str,help="model name")
-parser.add_argument("--num_classes",type=int,help="model class number")
+parser.add_argument("--num_classes",type=int,default=1,help="model class number, not important at test")
 parser.add_argument("--in_channel",default=3,type=int,help="model input channel")
 parser.add_argument("--galler_id_reform",default=2,type=int,help="galler_id_reform")
 args = parser.parse_args()
@@ -30,6 +30,7 @@ query_dir = os.path.join(root,"query")
 gallery_dir = os.path.join(root,"gallery")
 transform = torchvision.transforms.Compose([
     torchvision.transforms.Resize((128,64)),
+    # torchvision.transforms.Resize((256, 128)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
@@ -45,16 +46,22 @@ galleryloader = torch.utils.data.DataLoader(
 # net definition
 if args.model_name:
     print('use model: ',args.model_name)
-    net=build_model(args.model_name,num_classes=args.num_classes, pretrained=True,in_channel=args.in_channel,reid=True)
+    #pretrained=False, use my checkpoint
+    net=build_model(args.model_name,num_classes=args.num_classes, pretrained=False,in_channel=args.in_channel)
 else:
     net = Net(num_classes=args.num_classes,reid=True)
 
 assert os.path.isfile(args.checkpoint), "Error: no checkpoint file found!"
 print('Loading weight from ',args.checkpoint)
 checkpoint = torch.load(args.checkpoint,map_location=device)
-net_dict = checkpoint['net_dict']
-net.load_state_dict(net_dict, strict=False)
-net.eval()
+if 'net_dict' in checkpoint.keys():
+    net_dict = checkpoint['net_dict']
+else:
+    net_dict = checkpoint
+
+net.load_state_dict({k.replace('module.',''):v for k,v in net_dict.items()})
+ 
+net.eval() #output only feature
 net.to(device)
 print("Net\n",net)
 
