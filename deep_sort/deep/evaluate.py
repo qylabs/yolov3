@@ -1,12 +1,18 @@
 import re
 import sys
+import os
 import torch
+from torch.utils import data
+import torchvision
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
+import numpy as np
+from reidtools import visualize_ranked_results
 
 
 def euclidean_dist(x, y):
     """
+    smaller dist means closer score
     Args:
         x: pytorch Variable, with shape [m, d]
         y: pytorch Variable, with shape [n, d]
@@ -28,6 +34,7 @@ def euclidean_dist(x, y):
 
 def cosin_dist(x,y):
     """
+    larger dist means closer score
     Args:
         x: pytorch Variable, with shape [m, d]
         y: pytorch Variable, with shape [n, d]
@@ -40,6 +47,94 @@ def cosin_dist(x,y):
     return dist
 
 
+def eval_market1501(distmat, q_ids, g_ids, max_rank=10):
+    """
+    Evaluates CMC(Cumulative Matching Characteristics) rank and mAP
+        Acc_k=1 if topk g_id==q_id else 0
+        CMC used for closed_gallery_set tests
+        
+        AP=(num_of_topkg_id==q_id)/tot_query_number
+        mAP=mean_of_all_q_id_AP
+        recall=(num_of_topkg_id==q_id)/tot_gallery_g_id=q_id
+
+    # Evaluation with market1501 metric
+    # Key: for each query identity, its gallery images from the same camera view are discarded.
+
+    distmat: np.array, shape (num_q, num_g) 2D  distmat smaller means closer
+    q_ids: query label ids, 1D shape=num_q
+    g_ids: gallery label ids, 1D
+    """
+    num_q, num_g = distmat.shape
+
+    if num_g < max_rank:
+        max_rank = num_g
+        print(
+            'Note: number of gallery samples is quite small, got {}'.
+            format(num_g)
+        )
+
+    indices = np.argsort(distmat, axis=1)
+    matches = (g_ids[indices] == q_ids[:, np.newaxis]).astype(np.int32)#This is to find which (row,col) is matched in the distmat
+
+    # compute cmc curve for each query
+    all_cmc = []
+    all_AP = []
+    num_valid_q = 0. # number of valid query
+
+    #loop for every q_id
+    for q_idx in range(num_q):
+        # get query id
+        q_id = q_ids[q_idx]
+
+        # compute cmc curve
+        raw_cmc = matches[q_idx] # binary vector, positions with value 1 are correct matches
+        if not np.any(raw_cmc):
+            # this condition is true when query identity does not appear in gallery
+            continue
+
+        cmc = raw_cmc.cumsum()
+        cmc[cmc > 1] = 1
+        all_cmc.append(cmc[:max_rank]) #only obtain top rank-k cmc
+        num_valid_q += 1.
+
+        # compute average precision
+        # reference: https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
+        num_rel = raw_cmc.sum() #tot g_id==q_id in the gallery
+        tmp_cmc = raw_cmc.cumsum()
+        tmp_cmc = [x / (i+1.) for i, x in enumerate(tmp_cmc)] #here precision is cumulative precision. different from classification precision correction_num/tot_num
+        tmp_cmc = np.asarray(tmp_cmc) * raw_cmc #obtain only true query precision
+        AP = tmp_cmc.sum() / num_rel #average of precision
+        all_AP.append(AP)
+
+    assert num_valid_q > 0, 'Error: all query identities do not appear in gallery'
+
+    all_cmc = np.asarray(all_cmc).astype(np.float32)
+    all_cmc = all_cmc.sum(0) / num_valid_q
+
+    mAP = np.mean(all_AP)#mean of tot query
+
+    return all_cmc, all_AP, mAP
+
+
+
+def load_data(data_dir):
+    # data loader
+    root = data_dir
+    query_dir = os.path.join(root,"query")
+    gallery_dir = os.path.join(root,"gallery")
+    transform = torchvision.transforms.Compose([
+        torchvision.transforms.Resize((128,64)),
+        # torchvision.transforms.Resize((256, 128)),
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    querydataset = torchvision.datasets.ImageFolder(query_dir, transform=transform)
+    gallerydataset = torchvision.datasets.ImageFolder(gallery_dir, transform=transform)
+
+    return querydataset,gallerydataset
+
+
+
 features_file= sys.argv[1] #the arg1
 print('features_file ',features_file)
 features = torch.load(features_file)
@@ -48,10 +143,10 @@ ql = features["ql"]
 gf = features["gf"]
 gl = features["gl"]
 
-# scores = qf.mm(gf.t())
-# scores=euclidean_dist(qf,gf) #
-scores=cosin_dist(qf,gf) #3368*19732. effective for classification model
-top5_similarity,top5_idx=scores.topk(5, dim=1)
+
+
+score_mat=cosin_dist(qf,gf) #smaller dist means larger score similarity
+top5_similarity,top5_idx=score_mat.topk(5, dim=1)
 res = top5_idx[:,0] #got top1
 top1correct = gl[res].eq(ql).sum().item()
 # top5correct=gl[top5_idx].eq(ql.unsqueeze(1)).sum().item()
@@ -60,7 +155,7 @@ print("===Summary===")
 print("gallery feature/label",gf.size(),gl.size())
 print("query feature/label",qf.size(),ql.size())
 
-print('top1 label=\n',gl[res])
+print('top1 gallery label=\n',gl[res])
 print('query label=\n',ql)
 print("Acc top1:{:.3f}".format(top1correct/ql.size(0))) #0.985
 
@@ -73,10 +168,26 @@ print(C2)
 # print('top5_idx label=\n',gl[top5_idx[res]])
 # print("Acc top5:{:.3f}".format(top5correct/ql.size(0)))
 
-# mask_false=torch.where(gl[res]!=ql)[0]
+
+# dist_mat = qf.mm(gf.t())
+# dist_mat=euclidean_dist(qf,gf).numpy()
+dist_mat=1-cosin_dist(qf,gf).numpy() #q_num*g_num
+print('dist_mat.shape ',dist_mat.shape)
+q_ids=ql.numpy()
+g_ids=gl.numpy()
+
+
+all_cmc, all_AP, mAP=eval_market1501(dist_mat, q_ids, g_ids, max_rank=10)
+print('all_cmc \n',all_cmc)
+print('all_AP \n',all_AP,len(all_AP))
+print('mAP: ',mAP)
 
 
 
-
-
-
+#visualize ranked results
+if sys.argv[2]:
+    querydataset,gallerydataset=load_data(sys.argv[2])
+    visualize_ranked_results(dist_mat,(querydataset.imgs,gallerydataset.imgs),
+                            data_type='image',width=64,height=128,
+                            save_dir='result',topk=5)
+    
