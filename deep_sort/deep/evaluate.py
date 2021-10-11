@@ -182,6 +182,11 @@ print('all_cmc \n',all_cmc)
 print('all_AP \n',all_AP,len(all_AP))
 print('mAP: ',mAP)
 
+title='cmc'+features_file.split('features')[-1].split('.')[0]
+plt.title(title)
+plt.plot(range(1,len(all_cmc)+1),all_cmc,marker='o',markersize=3)
+plt.xlim(left=0.2)
+plt.savefig(title+'.jpg')
 
 
 #visualize ranked results
