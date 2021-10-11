@@ -38,7 +38,8 @@ class ConvBlock(nn.Module):
         self.bn = nn.BatchNorm2d(out_c)
 
     def forward(self, x):
-        return F.relu6(self.bn(self.conv(x)))
+        # return F.relu6(self.bn(self.conv(x)))
+        return F.relu(self.bn(self.conv(x)))
 
 
 class Bottleneck(nn.Module):

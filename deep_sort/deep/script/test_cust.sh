@@ -26,7 +26,8 @@ DATA=/home/wangtao/project/yolov3/deep_sort/deep/data/cust_person_reid_reverse
 CHECKPOINT=/home/wangtao/project/yolov3/deep_sort/deep/checkpoint/mobilenetv2_1dot0_market.pth.tar
 MODEL_NAME=mobilenetv2_x1_0
 # SAVE_FEATURE=./checkpoint/features_mobilenetv2_x1_0_r256_cust_reverse.pth
-SAVE_FEATURE=./checkpoint/features_mobilenetv2_x1_0_r128_cust_reverse.pth
+# SAVE_FEATURE=./checkpoint/features_mobilenetv2_x1_0_r128_cust_reverse.pth
+SAVE_FEATURE=./checkpoint/features_mobilenetv2_x1_0_r128_cust_reverse_relu.pth
 
 
 # DATA=/home/wangtao/project/yolov3/deep_sort/deep/data/cust_person_reid_reverse
