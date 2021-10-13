@@ -1,6 +1,7 @@
 import re
 import sys
 import os
+from types import new_class
 import torch
 from torch.utils import data
 import torchvision
@@ -8,7 +9,11 @@ from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import numpy as np
 from reidtools import visualize_ranked_results
+from data_cluster import TSNE_cluster, MDS_cluster
 
+def normalize_tensor(x):
+    x_norm=x.div(x.norm(p=2,dim=1,keepdim=True))
+    return x_norm
 
 def euclidean_dist(x, y):
     """
@@ -185,14 +190,40 @@ print('mAP: ',mAP)
 title='cmc'+features_file.split('features')[-1].split('.')[0]
 plt.title(title)
 plt.plot(range(1,len(all_cmc)+1),all_cmc,marker='o',markersize=3)
-plt.xlim(left=0.2)
+plt.xlim(0,10)
+plt.xticks(range(1,11))
 plt.savefig(title+'.jpg')
 
 
+all_dist=np.sort(dist_mat, axis=1)
+plt.figure(figsize=(5,15))
+for idx in range(10):
+    plt.subplot(10,1,idx+1)
+    plt.hist(all_dist[:,idx],bins=10)
+    plt.xlim(0,0.4)
+
+plt.subplots_adjust(hspace=0.5)
+dist_plot_name='distance_top10'+features_file.split('features')[-1].split('.')[0]+'.jpg'
+plt.savefig(dist_plot_name, dpi=120,bbox_inches='tight')
+
 #visualize ranked results
 if sys.argv[2]:
+    save_dir='result'+features_file.split('features')[-1].split('.')[0]
     querydataset,gallerydataset=load_data(sys.argv[2])
     visualize_ranked_results(dist_mat,(querydataset.imgs,gallerydataset.imgs),
                             data_type='image',width=64,height=128,
-                            save_dir='result',topk=5)
-    
+                            save_dir=save_dir,topk=5)
+
+clustering=True
+if clustering:
+    X=torch.cat((qf,gf),dim=0)
+    X=normalize_tensor(X)
+    y=torch.cat((ql,gl))
+    n_class=len(y.unique())
+    print('n_class ',n_class)
+    tsne_title='feature_norm_tsne'+features_file.split('features')[-1].split('.')[0]+'.jpg'
+    TSNE_cluster(X,y,n_class,plot_save=tsne_title)
+
+    mds_title='feature_norm_mds'+features_file.split('features')[-1].split('.')[0]+'.jpg'
+    # MDS_cluster(X,y,n_class,plot_save=mds_title)
+

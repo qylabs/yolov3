@@ -15,10 +15,12 @@
 # features_file=checkpoint/features_mobilenetv2_x1_0_r128_cust_reverse.pth  #0.814
 # features_file=checkpoint/features_mobilenetv2_x1_0_r256_cust_reverse.pth  #0.801
 features_file=checkpoint/features_mobilenetv2_x1_0_r128_cust_reverse_relu.pth  #0.820
+# features_file=checkpoint/features_mobilenetv2_x1_0_r128_cust_relu.pth  #
 
 
 # features_file=checkpoint/features_osnet_x0_25_r256_cust_reverse.pth
 
 data_dir='data/cust_person_reid_reverse'
+# data_dir='data/cust_person_reid'
 
 python evaluate.py ${features_file} ${data_dir}
