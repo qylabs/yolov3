@@ -33,7 +33,7 @@ def detect(opt):
     # Initialize
     set_logging()
     device = select_device(opt.device)
-    half = device.type != 'cpu'  # half precision only supported on CUDA
+    half = False  # half precision only supported on CUDA
 
     # Load model
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -74,6 +74,8 @@ def detect(opt):
         t1 = time_synchronized()
         pred = model(img, augment=opt.augment)[0] #batched result pred,batch=1
         # Apply NMS
+        t = pred[:,:,4] > 0.2
+        print(pred[t])
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, opt.classes, opt.agnostic_nms,
                                    max_det=opt.max_det)# after nms got [pred per image], len=batch_size=1
         t2 = time_synchronized()
