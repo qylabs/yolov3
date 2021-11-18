@@ -1,12 +1,11 @@
 #!/bin/bash
 
-DATA=data/WiderPerson_gray.yaml
+DATA=data/qyhit_data.yaml
 MODEL_CFG=models/yolov3-tiny3_gray.yaml
-# WEIGHTS=runs/train/exp/weights/best.pt
-WEIGHTS=None
-EPOCHS=200
+WEIGHTS=runs/train/baseline_relu/weights/last.pt
+EPOCHS=100
 IMG_SIZE=320
-HYP=data/hyp.scratch_gray.yaml
+HYP=data/hyp.finetune_gray.yaml #change from hyp.scratch.yaml to hyp.finetune.yaml
 
 python train.py --cfg ${MODEL_CFG} \
                 --weights ${WEIGHTS} \

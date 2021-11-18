@@ -8,7 +8,7 @@
 #                   P         R     mAP.5 mAP.5:.95       box       obj       cls
 # Metrics:        0.6     0.936     0.896     0.684    0.0115   0.00805   0.00146
 
-lr0: 0.004
+lr0: 0.01
 lrf: 0.12
 momentum: 0.85
 weight_decay: 0.00036
@@ -25,16 +25,16 @@ anchor_t: 2.91
 # anchors: 3.63
 fl_gamma: 0.0
 hsv_h: 0.0138
-hsv_s: 0.664
-hsv_v: 0.464
-degrees: 0.373
-translate: 0.245
+hsv_s: 0.264
+hsv_v: 0.264
+degrees: 0.
+translate: 0.
 scale: 0.5
 shear: 0.0
 perspective: 0.0
-flipud: 0.00856
+flipud: 0.0
 fliplr: 0.5
-mosaic: 1.0
+mosaic: 1
 mixup: 0
 
 gray: 1 #translate img to gray

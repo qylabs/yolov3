@@ -85,6 +85,7 @@ def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=Fa
                         num_workers=nw,
                         sampler=sampler,
                         pin_memory=True,
+                        shuffle = True,
                         collate_fn=LoadImagesAndLabels.collate_fn4 if quad else LoadImagesAndLabels.collate_fn)
     return dataloader, dataset
 
@@ -603,15 +604,19 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         labels_out = torch.zeros((nL, 6))
         if nL:
             labels_out[:, 1:] = torch.from_numpy(labels)
-
-        # Convert
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
-        img = np.ascontiguousarray(img)
-
+        
         if hyp.get('gray'):
             #gray=0.2989*r+0.5870*g+0.1140*b
-            img2=0.2989*img[0,:,:]+0.5870*img[1,:,:]+0.1140*img[2,:,:]
-            img=img2[np.newaxis,:]
+            #img2=0.2989*img[0,:,:]+0.5870*img[1,:,:]+0.1140*img[2,:,:]
+            #img=img2[np.newaxis,:]
+            img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            img = np.expand_dims(img,0)
+
+        # Convert
+        else:
+            img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        img = np.ascontiguousarray(img)
+
 
         return torch.from_numpy(img), labels_out, self.img_files[index], shapes
 
@@ -894,6 +899,7 @@ def random_perspective(img, targets=(), segments=(), degrees=10, translate=.1, s
     R = np.eye(3)
     a = random.uniform(-degrees, degrees)
     # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
+    #s = random.uniform(1 , 1 * scale)
     s = random.uniform(1 - scale, 1 + scale)
     # s = 2 ** random.uniform(-scale, scale)
     R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)

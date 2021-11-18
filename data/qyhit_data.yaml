@@ -1,4 +1,5 @@
-#WiderPerson: A Diverse Dataset for Dense Pedestrian Detection in the Wild
+#based on WiderPerson trained model
+# test/finetune/retrain on our cust_data
 
 # 13,382 images and label about 400K annotations with various kinds of occlusions
 # 8000/1000/4382 images as training, validation and testing subsets
@@ -14,8 +15,8 @@
 # should -1
 
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: /home/allen/data/tmp/images/train/ # 8000 images
-val: mydataset/test_qy   # 1000 images 
+train: mydataset/mix_no_person
+val: mydataset/test_qy
 
 # number of classes
 nc: 1
