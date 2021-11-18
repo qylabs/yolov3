@@ -8,28 +8,26 @@ from model import Net
 from modellib import build_model
 
 class Extractor(object):
-    def __init__(self, net, use_cuda=False):
+    def __init__(self, 
+                net, 
+                image_size=(256, 128),
+                pixel_mean=[0.485, 0.456, 0.406],
+                pixel_std=[0.229, 0.224, 0.225],
+                pixel_norm=True,
+                **kwargs):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.net=net.to(self.device)
-        self.size = (64, 128)
-        self.norm = transforms.Compose([
-            transforms.ToTensor(),
-            # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ])
+        self.net.eval()
+        self.size = image_size
+        
+        # Build transform functions
+        transforms_list = [transforms.Resize(self.size),transforms.ToTensor()]
+        if pixel_norm:
+            transforms_list+=[transforms.Normalize(mean=pixel_mean,std=pixel_std)]
+        self.norm = transforms.Compose(transforms_list)
 
     def _preprocess(self, im_crops):
-        """
-        TODO:
-            1. to float with scale from 0 to 1
-            2. resize to (64, 128) as Market1501 dataset did
-            3. concatenate to a numpy array
-            3. to torch Tensor
-            4. normalize
-        """
-        def _resize(im, size):
-            return cv2.resize(im.astype(np.float32)/255., size)
-
-        im_batch = torch.cat([self.norm(_resize(im, self.size)).unsqueeze(0) for im in im_crops], dim=0).float()
+        im_batch = torch.cat([self.norm(im).unsqueeze(0) for im in im_crops], dim=0).float()
         return im_batch
 
 

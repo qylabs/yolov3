@@ -23,19 +23,29 @@ if __name__ == '__main__':
     device = 'cpu'
     if args.model_name:
         print('use model: ',args.model_name)
-        model=build_model(args.model_name,num_classes=args.num_classes, pretrained=True,in_channel=args.in_channel,reid=True)
+        model=build_model(args.model_name,num_classes=args.num_classes, pretrained=False,in_channel=args.in_channel)
     else:
         model = Net(num_classes=args.num_classes,reid=True)
-
+    
     checkpoint = torch.load(args.weights,map_location=device)
     # import ipdb; ipdb.set_trace()
-    net_dict = checkpoint['net_dict']
-    model.load_state_dict(net_dict)
-    best_acc = checkpoint['acc']
-    print('best_acc: ',best_acc)
+    if 'net_dict' in checkpoint.keys():
+        net_dict = checkpoint['net_dict']
+    else:
+        net_dict = checkpoint
+
+    model.load_state_dict({k.replace('module.',''):v for k,v in net_dict.items()})
 
     img = torch.randn(args.batch_size, args.in_channel, *args.img_size).to(device)
     # Update model
+    for k, m in model.named_modules():
+        if isinstance(m,nn.LeakyReLU):
+            print('replace LeakyReLU as ReLU')
+            m=nn.ReLU()
+        if isinstance(m,nn.ReLU6):
+            print('replace ReLU6 as ReLU')
+            m=nn.ReLU()
+
     if args.half:
         img, model = img.half(), model.half()  # to FP16
     
@@ -43,7 +53,8 @@ if __name__ == '__main__':
         y = model(img)  # dry runs
     
     # ONNX export ------------------------------------------------------------------------------------------------------
-    f = args.weights.replace('.pt', '.onnx')  # filename
+    # f = args.weights.replace('.pt', '.onnx')  # filename
+    f = args.weights.split('.')[0]+'.onnx'  # filename
     torch.onnx.export(model, img, f, verbose=False, opset_version=args.opset_version, input_names=['images'],
                         training=torch.onnx.TrainingMode.TRAINING if args.train else torch.onnx.TrainingMode.EVAL,
                         do_constant_folding=not args.train,

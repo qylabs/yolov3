@@ -423,11 +423,12 @@ class OSNet(nn.Module):
         if return_featuremaps:
             return x
         v = self.global_avgpool(x)
+        if not self.training:
+            return v
         v = v.view(v.size(0), -1)
         if self.fc is not None:
             v = self.fc(v)
-        if not self.training:
-            return v
+        
         y = self.classifier(v)
         if self.loss == 'softmax':
             return y

@@ -357,16 +357,13 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         f = self.featuremaps(x)
-        if self.reid:
-            return  f
         v = self.global_avgpool(f)
+        if not self.training:#for better export. and put normalize outside to metric
+            return v
         v = v.view(v.size(0), -1)
 
         if self.fc is not None:
             v = self.fc(v)
-
-        # if not self.training:
-        #     return v
 
         y = self.classifier(v)
 
