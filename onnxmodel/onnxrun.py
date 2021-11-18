@@ -613,6 +613,6 @@ if __name__=="__main__":
     # yolo_proc_simp_1H(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45)
 
     print("==============================")
-    onnx_path='./runs/train/exp_yolov3_tiny3_gray_WP/weights/yolov3_tiny3_gray_noreshap_nosigmoid.onnx'
-    yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc=5,conf_thres=0.2,iou_thres=0.45,iter=True)
+    onnx_path='./runs/train/exp2/weights/qat_no_quant.onnx'
+    yolo_proc_simp_2H_noreshape_nosigmoid(img_path,onnx_path,strides,anchors,nc=1,conf_thres=0.2,iou_thres=0.45,iter=True)
 
