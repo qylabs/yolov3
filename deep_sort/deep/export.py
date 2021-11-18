@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_classes",type=int,help="model class number")
     parser.add_argument("--in_channel",default=3,type=int,help="model input channel")
     args = parser.parse_args()
-    device = "cuda:0" if torch.cuda.is_available() else 'cpu'
+    device = 'cpu'
     if args.model_name:
         print('use model: ',args.model_name)
         model=build_model(args.model_name,num_classes=args.num_classes, pretrained=True,in_channel=args.in_channel,reid=True)
